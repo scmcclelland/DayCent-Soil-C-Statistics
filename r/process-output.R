@@ -55,8 +55,8 @@ source('r/process-output-functions.R')
 # DIRECTORIES
 main.dir  = getwd() 
 print(main.dir)
-working.dir = file.path(main.dir, "data", "model-output", args[1]) # UPDATE
-rda.dir = file.path(main.dir, "data", "uncertainty-input") # UPDATE
+working.dir = file.path(main.dir, "test-data", "model-output", args[1]) 
+rda.dir = file.path(main.dir, "test-data", "uncertainty-input")
 if (!dir.exists(working.dir)) {
   stop("Missing working directory: ", working.dir)
 }
