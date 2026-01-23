@@ -56,3 +56,6 @@ test-data/
 
 # Slurm test scripts
 bash/process-model-output-array-test.slurm
+
+# Deprecated scripts
+bash/deprecated/
