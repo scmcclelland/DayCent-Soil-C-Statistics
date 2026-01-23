@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=16G
+#SBATCH --mem=64G
 #SBATCH --time=00:30:00
 #SBATCH --array=1-3%1
 #SBATCH --output=logs/dc_proc_test_%A_%a.out
