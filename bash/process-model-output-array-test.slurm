@@ -10,7 +10,11 @@
 #SBATCH --output=slurm-%A_%a.out
 #SBATCH --error=slurm-%A_%a.err
 
-module load R
+module purge
+module load R/4.2.1
+
+# Preflight: confirm Rscript and glibc compatibility
+Rscript --version
 
 # Small trial: 3 tasks only
 cmds=(
