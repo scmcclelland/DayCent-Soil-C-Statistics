@@ -7,13 +7,10 @@
 #SBATCH --mem=64G
 #SBATCH --time=00:30:00
 #SBATCH --array=1-3%1
-#SBATCH --output=logs/dc_proc_test_%A_%a.out
-#SBATCH --error=logs/dc_proc_test_%A_%a.err
+#SBATCH --output=slurm-%A_%a.out
+#SBATCH --error=slurm-%A_%a.err
 
 module load R
-
-# Ensure log dir exists on the compute node
-mkdir -p logs
 
 # Small trial: 3 tasks only
 cmds=(
