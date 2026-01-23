@@ -35,9 +35,9 @@ dir = dir[[1]][1]
 
 setwd(dir)
 source("test-data/LME-data/SimBetas_func.R")
-LME_data = paste(dir, 'test-data/LME-data', sep = '/')
-m_data   = paste(dir, 'test-data/uncertainty-input', sep = '/') 
-o_data   = paste(dir, 'test-data/uncertainty-output', sep = '/') 
+LME_data = paste(dir, 'data/LME-data', sep = '/')
+m_data   = paste(dir, 'data/uncertainty-input', sep = '/') 
+o_data   = paste(dir, 'data/uncertainty-output', sep = '/') 
 #-----------------------------------------------------------------------------------------
 # Set MC conditions
 #-----------------------------------------------------------------------------------------
