@@ -176,8 +176,8 @@ gc()
             setcolorder(adj_somsc_10dt, c('gridid', 'crop', 'irr'))
             setnames(adj_somsc_10dt, 'delta_adj_somsc_sum', 's_somsc')
             adj_somsc_gr_10dt = rbind(adj_somsc_gr_dt, adj_somsc_10dt)
-            print(paste0('Writing 10-yr uncertainty results for ', scen, ' ', c, ' ',
-                         ir, ' gridid ', id, ' to csv file.'))
+            # print(paste0('Writing 10-yr uncertainty results for ', scen, ' ', c, ' ',
+            #              ir, ' gridid ', id, ' to csv file.'))
             fwrite(adj_somsc_gr_10dt, file = paste0(o_data, '/10-yr/s_somsc-10yr-uncertainty-',scen,'-',c,
                                                   '-',ir,'.csv'),
                    append = TRUE)
@@ -193,8 +193,8 @@ gc()
             setcolorder(adj_somsc_dt, c('gridid', 'crop', 'irr'))
             setnames(adj_somsc_dt, 'delta_adj_somsc_sum', 's_somsc')
             adj_somsc_gr_dt = rbind(adj_somsc_gr_dt, adj_somsc_dt)
-            print(paste0('Writing 20-yr uncertainty results for ', scen, ' ', c, ' ',
-                         ir, ' gridid ', id, ' to csv file.'))
+            # print(paste0('Writing 20-yr uncertainty results for ', scen, ' ', c, ' ',
+            #              ir, ' gridid ', id, ' to csv file.'))
             fwrite(adj_somsc_gr_dt, file = paste0(o_data, '/20-yr/s_somsc-20yr-uncertainty-',scen,'-',c,
                                                   '-',ir,'.csv'),
                    append = TRUE)

@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=dc_uncert
-#SBATCH --partition=short-40core-shared
+#SBATCH --partition=long-40core-shared
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=64G
-#SBATCH --time=04:00:00
+#SBATCH --mem=16G
+#SBATCH --time=24:00:00
 #SBATCH --array=1-88%4
 #SBATCH --output=logs/dc_uncert_%A_%a.out
 #SBATCH --error=logs/dc_uncert_%A_%a.err
