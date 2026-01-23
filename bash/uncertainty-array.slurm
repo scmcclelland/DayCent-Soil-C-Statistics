@@ -9,6 +9,8 @@
 #SBATCH --array=1-88%4
 #SBATCH --output=logs/dc_uncert_%A_%a.out
 #SBATCH --error=logs/dc_uncert_%A_%a.err
+#SBATCH --mail-user=shelby.mcclelland@stonybrook.edu
+#SBATCH --mail-type=BEGIN,END,FAIL
 
 module purge
 module load R/4.2.1
