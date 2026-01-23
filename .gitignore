@@ -53,3 +53,6 @@ test-data/
 
 # Other
 .DS_Store
+
+# Slurm test scripts
+bash/process-model-output-array-test.slurm

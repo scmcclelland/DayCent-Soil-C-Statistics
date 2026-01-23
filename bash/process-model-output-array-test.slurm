@@ -7,8 +7,8 @@
 #SBATCH --mem=64G
 #SBATCH --time=00:30:00
 #SBATCH --array=1-3%1
-#SBATCH --output=slurm-%A_%a.out
-#SBATCH --error=slurm-%A_%a.err
+#SBATCH --output=logs/dc_proc_test_%A_%a.out
+#SBATCH --error=logs/dc_proc_test_%A_%a.err
 
 module purge
 module load R/4.2.1
