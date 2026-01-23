@@ -34,7 +34,7 @@ dir = str_split(dir, '/r')
 dir = dir[[1]][1]
 
 setwd(dir)
-source("test-data/LME-data/SimBetas_func.R")
+source("data/LME-data/SimBetas_func.R")
 LME_data = paste(dir, 'data/LME-data', sep = '/')
 m_data   = paste(dir, 'data/uncertainty-input', sep = '/') 
 o_data   = paste(dir, 'data/uncertainty-output', sep = '/') 
