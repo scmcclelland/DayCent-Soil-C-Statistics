@@ -126,8 +126,8 @@ gc()
         adj_somsc_gr_dt = data.table()
         
         ## Model Creation - Monte Carlo  ##
-          print(paste0('Running uncertainty iteration for ', scen, ' ', c, ' ',
-                       ir, ' gridid ', id, '.'))
+          # print(paste0('Running uncertainty iteration for ', scen, ' ', c, ' ',
+          #              ir, ' gridid ', id, '.'))
           {
             adj_somsc_list = vector("list", nrep) 
             
@@ -203,3 +203,4 @@ gc()
       }
     }
   }
+print(paste0("Done with uncertainty for ", scen, " ", crop_n, " ", irr_l, "."))
