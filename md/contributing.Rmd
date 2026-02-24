@@ -1,0 +1,110 @@
+---
+title: "GitHub Workflow"
+author: "S.C. McClelland"
+date: "2026-02-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+Users should follow the guidelines in this document for creating branches from main to add features or fix scripts.
+
+## Best practices
+
+-   Never commit directly to main.
+
+-   One branch per task.
+
+-   Push branch, open PR early, update PR with more commits.
+
+-   Merge main into your branch regularly (git merge main).
+
+-   After PR merges, delete branch and pull main.
+
+## Conventions
+
+branches: - feature/<initials>-<short-desc>
+
+-   fix/<initials>-<short-desc>
+
+-   docs/<short-desc>
+
+commits: - start with a verb (Add, Fix, Refactor, Document)
+
+-   keep short (a few words only)
+
+### New users (one-time set-up)
+
+```{bash one time set-up}
+# (1) clone
+git clone <repo_url>
+cd <repo_folder>
+#
+# (2) identity
+git config --global user.name "First Last"
+git config --global user.email "email@domain.edu"
+#
+# (3) confirm remotes
+git remote -v
+#
+# (4) authentication
+# use SSH keys (recommended)
+```
+
+### User workflow
+
+```{bash workflow}
+# (1) start task
+git checkout main
+git pull origin main
+git checkout -b feature/<initials>-short-desc
+# Examples: 
+# feature/SCM-res-histogram
+# feature/SCM-ccg-res-percentiles
+#
+# (2) work loop
+# edit --> status --> add --> commit
+git status
+git add <file1> <file2>
+git commit -m "Short, specific message"
+#
+# (3) push branch and open pull request (PR)
+#
+# push
+git push -u origin feature/<initials>-short-desc
+#
+# then open PR (CLI or web UI)
+gh pr create --base main --head feature/<initials>-short-desc --fill
+# review and address any comments, continue to push to the same branch
+```
+
+### Avoiding conflicts
+
+```{bash conflicts}
+# stay up-to-date with main
+git checkout main
+git pull origin main
+git checkout feature/<initials>-short-desc
+git merge main
+# If conflict occurs
+# Open conflicted files, resolve markers <<<<<< / ====== / >>>>>>
+# then:
+git add <resolved_files>
+git commit -m "Resolve merge conflicts with main"
+git push
+```
+
+### Update local after branch merge to main
+
+```{bash update}
+git checkout main
+git pull origin main
+# delete local 
+git branch -d feature/<initials>-short-desc
+# prune deleted remote branch
+git fetch --prune
+```

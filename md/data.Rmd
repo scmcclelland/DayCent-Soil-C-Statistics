@@ -1,0 +1,17 @@
+---
+title: "Source Data Description"
+author: "S.C. McClelland"
+date: "2026-02-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+Text
+
+Consider loading an image of header here.
+

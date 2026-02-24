@@ -50,7 +50,7 @@ yr_max = s_yr + 1L
 scenarios = args[3]
 #-----------------------------------------------------------------------------------------
 # FUNCTIONS
-source('r/process-output-functions.R')
+source('r/functions/process-output-functions.R')
 #-----------------------------------------------------------------------------------------
 # DIRECTORIES
 main.dir  = getwd() 

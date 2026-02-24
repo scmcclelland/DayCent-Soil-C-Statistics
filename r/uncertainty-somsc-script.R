@@ -34,10 +34,10 @@ dir = str_split(dir, '/r')
 dir = dir[[1]][1]
 
 setwd(dir)
-source("data/LME-data/SimBetas_func.R")
-LME_data = paste(dir, 'data/LME-data', sep = '/')
-m_data   = paste(dir, 'data/uncertainty-input', sep = '/') 
-o_data   = paste(dir, 'data/uncertainty-output', sep = '/') 
+source("test-data/LME-data/SimBetas_func.R")
+LME_data = paste(dir, 'test-data/LME-data', sep = '/')
+m_data   = paste(dir, 'test-data/uncertainty-input', sep = '/') 
+o_data   = paste(dir, 'test-data/uncertainty-output', sep = '/') 
 #-----------------------------------------------------------------------------------------
 # Set MC conditions
 #-----------------------------------------------------------------------------------------
@@ -126,8 +126,8 @@ gc()
         adj_somsc_gr_dt = data.table()
         
         ## Model Creation - Monte Carlo  ##
-          # print(paste0('Running uncertainty iteration for ', scen, ' ', c, ' ',
-          #              ir, ' gridid ', id, '.'))
+          print(paste0('Running uncertainty iteration for ', scen, ' ', c, ' ',
+                       ir, ' gridid ', id, '.'))
           {
             adj_somsc_list = vector("list", nrep) 
             
@@ -176,8 +176,8 @@ gc()
             setcolorder(adj_somsc_10dt, c('gridid', 'crop', 'irr'))
             setnames(adj_somsc_10dt, 'delta_adj_somsc_sum', 's_somsc')
             adj_somsc_gr_10dt = rbind(adj_somsc_gr_dt, adj_somsc_10dt)
-            # print(paste0('Writing 10-yr uncertainty results for ', scen, ' ', c, ' ',
-            #              ir, ' gridid ', id, ' to csv file.'))
+            print(paste0('Writing 10-yr uncertainty results for ', scen, ' ', c, ' ',
+                         ir, ' gridid ', id, ' to csv file.'))
             fwrite(adj_somsc_gr_10dt, file = paste0(o_data, '/10-yr/s_somsc-10yr-uncertainty-',scen,'-',c,
                                                   '-',ir,'.csv'),
                    append = TRUE)
@@ -193,8 +193,8 @@ gc()
             setcolorder(adj_somsc_dt, c('gridid', 'crop', 'irr'))
             setnames(adj_somsc_dt, 'delta_adj_somsc_sum', 's_somsc')
             adj_somsc_gr_dt = rbind(adj_somsc_gr_dt, adj_somsc_dt)
-            # print(paste0('Writing 20-yr uncertainty results for ', scen, ' ', c, ' ',
-            #              ir, ' gridid ', id, ' to csv file.'))
+            print(paste0('Writing 20-yr uncertainty results for ', scen, ' ', c, ' ',
+                         ir, ' gridid ', id, ' to csv file.'))
             fwrite(adj_somsc_gr_dt, file = paste0(o_data, '/20-yr/s_somsc-20yr-uncertainty-',scen,'-',c,
                                                   '-',ir,'.csv'),
                    append = TRUE)
@@ -203,4 +203,3 @@ gc()
       }
     }
   }
-print(paste0("Done with uncertainty for ", scen, " ", crop_n, " ", irr_l, "."))

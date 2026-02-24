@@ -1,0 +1,41 @@
+---
+title: "Example Code"
+author: "S.C. McClelland"
+date: "2026-02-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+Text
+
+### Estimating change in soil organic carbon
+
+```{r delta}
+# data sign: (currently negative)
+# units: Mg C and Mg CO2-eq
+
+```
+
+### Statistics
+
+```{r}
+
+```
+
+### Probability density functions
+
+```{r}
+
+```
+
+### Visualizations
+
+```{r}
+
+```
+
