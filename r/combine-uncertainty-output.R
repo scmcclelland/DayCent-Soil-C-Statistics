@@ -16,16 +16,17 @@ library(stringr)
 args   = commandArgs(trailingOnly = TRUE)
 if (isFALSE(length(args) == 1))
   stop(
-    'Needs 1 command-line argument (scenario selection).'
+    'Needs 2 command-line argument (scenario selection).'
   )
 # args[1] scenario selection
+# args[2] timeframe (10-yr or 20-yr)
 #-------------------------------------------------------------------------------
 # DIRECTORIES & FILES
 dir = dirname(getActiveDocumentContext()$path)
 dir = str_split(dir, '/r')
 dir = dir[[1]][1]
 setwd(dir)
-u_data    = paste(dir, 'data/uncertainty-output', sep = '/')
+u_data    = paste0(dir, '/data/uncertainty-output/', args[2])
 #-------------------------------------------------------------------------------
 # LOAD FILES by crop, irrigation
 #-------------------------------------------------------------------------------
