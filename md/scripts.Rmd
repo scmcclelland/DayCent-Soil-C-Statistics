@@ -11,31 +11,72 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Overview
 
+## Number and types of scripts
+
+Three types of scripts are required:
+
+1. Delta estimates (scenario - conv)
+
+2. Statistics
+
+3. Visualizations, PDFs / CDFs
 
 ## Script design
 
-The analyses for this project are highly repetitive. Thus, a basic script should
-be created that can take different management change scenarios ('scenario' column in 
-the data input files) as an argument. This will ensure consistent handling and
-treatment across all the management scenarios.
+The analyses for this project are highly repetitive. Thus, a basic script should be created that can take different management change scenarios ('scenario' column in the data input files) as an argument. This will ensure consistent handling and treatment across all the management scenarios.
+
+Scenario codes:
+
+-   conv (conventional / bau)
+
+-   res (full residue retention)
+
+-   ntill (no-tillage)
+
+-   ccg (grass cover crop)
+
+-   ccl (legume cover crop)
+
+-   ntill-res (no-tillage and full residue retention)
+
+-   ccg-res (grass cover crop and full residue retention)
+
+-   ccl-res (legume cover crop and full residue retention)
+
+-   ccg-ntill (grass cover crop, no-tillage, full residue retention)
+
+-   ccl-ntill (legume cover crop, no-tillage, full residue retention)
 
 ```{r arguments}
-
+args   = commandArgs(trailingOnly = TRUE)
+if (isFALSE(length(args) == 1))
+  stop(
+    'Needs 1 command-line argument (scenario selection).'
+  )
+# args[1] scenario selection
+# e.g. Rscript script.R conv
 ```
 
 ## File header
 
 ```{r header}
+# file name:    <file-name>.R
+# created:      XX Month 2026
+# last updated: XX Month 2026
+# author:       First Last
+
+# description: <script description here> 
 
 ```
-
 
 ## Libraries
 
 ```{r libs}
-library(data.table)
-library(rstudioapi)
+library(data.table) # for large data tables
+library(ggplot2)    # plotting
+library(ggridges)   # plotting
+library(rstudioapi) # paths
+library(sf)         # spatial data
+library(terra)      # spatial data
+options(scipen = 999) # for decimal notation
 ```
-
-
-## Organization

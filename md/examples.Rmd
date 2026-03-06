@@ -11,31 +11,381 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Overview
 
-Text
+Example code snippets for analysis scripts are available here. A full script
+example is available at the end of this document.
 
 ### Estimating change in soil organic carbon
 
 ```{r delta}
 # data sign: (currently negative)
 # units: Mg C and Mg CO2-eq
+delta_soc_co2_eq          = function(delta_somsc) { # negative output indicates soil C sink
+  gmwCO2 = 44
+  gmwC   = 12
+  Mg_ha  = 100
+  delta_soc_co2_eq        = ((-delta_somsc)*(gmwCO2/gmwC))/Mg_ha 
+}
+# convert from Mg C to Mg CO2-eq
+dt[, s_SOC   := delta_soc_co2_eq(s_somsc)]
 
+#------------------------------------------------------------------------------
+# ESTIMATE DELTA (always load conv_dt)
+#------------------------------------------------------------------------------
+# delta is scenario - conv
+{
+  ## example for res ##
+d_res_dt = res_dt[conv_dt[, -c('scenario')], on = .(gridid   = gridid,
+                                                            crop     = crop,
+                                                            irr      = irr,
+                                                            ssp      = ssp,
+                                                            gcm      = gcm,
+                                                            y_block  = y_block,
+                                                            rep      = rep)]
+rm(res_dt, conv_dt) # save space
+gc()
+# compute d_s_SOC (delta SOC)
+d_res_dt[, d_s_SOC := s_SOC - i.s_SOC]
+# remove absolute values (we only want difference)
+d_res_dt[, i.s_SOC := NULL] 
+d_res_dt[, s_SOC := NULL]
+}
 ```
 
 ### Statistics
 
-```{r}
-
+```{r monte carlo}
+# compute mean, median, quantile / percentile responses for each iteration / rep
+# mean
+dt_m = dt[, lapply(.SD, mean), .SDcols = 'd_s_SOC',
+                    by = .(rep)]
+# 25th percentile
+dt_q2 = dt[, lapply(.SD, function(x) {quantile(x)[2]}),
+                  .SDcols = 'd_s_SOC',
+                  by = .(rep)]
 ```
 
-### Probability density functions
+### Full example
 
-```{r}
+This is an example script for estimating statistics and visualizing data. It 
+provides an example for global and two country-level estimates. We will also 
+need to add in soil and environmental features for additional analyses (TBD).
 
-```
+The PDF and CDF approach will also need to be refined further.
 
-### Visualizations
+```{r full example}
+# filename:     histogram.R
+# created:      22 March 2025
+# last updated: 04 February 2026
+# author:       S.C. McClelland
 
-```{r}
+# description:  This script computes statistics, pdfs, and cdfs. 
+#----------------------------------------------------------------
+# libraries
+#----------------------------------------------------------------
+library(data.table)
+library(ggplot2)
+library(ggridges)
+library(rstudioapi)
+library(sf)
+library(terra)
+options(scipen = 999)
+#----------------------------------------------------------------
+# set base paths
+#----------------------------------------------------------------
+# get current directory, files should be in same directory
+b_path = dirname(getActiveDocumentContext()$path)
+d_path = paste(b_path, 'data', sep = '/')
+shp_p  = paste(b_path, 'shp', sep = '/')
+#----------------------------------------------------------------
+# load data tables
+#----------------------------------------------------------------
+# data overview:
+# scenario   residue retention
+# y_block    2036 (21 years) 
+# gridid     cell numbers
+# crop       maiz (maize), soyb(soybean), swht (spring wheat), wwht (winter wheat)
+# irr        0 (rainfed), 1 (irrigated)
+# d_s_SOC    SOC (soil carbon) response, Mg CO2-eq ha-1
+# Positive responses = higher emissions
+# Negative responses = mitigation or emissions reductions
+load(paste(d_path, 'res-delta-ghg-flux-uncertainty.RData', sep = '/'))
+head(d_res_dt)
+d_res_dt = d_res_dt[,c('gridid', 'crop', 'irr', 'rep', 'd_s_SOC')]
+#----------------------------------------------------------------
+# GLOBAL statistics
+#----------------------------------------------------------------
+# mean
+res_mean = d_res_dt[, lapply(.SD, mean), .SDcols = 'd_s_SOC',
+                    by = .(rep)]
+# median
+res_median = d_res_dt[, lapply(.SD, median), .SDcols = 'd_s_SOC',
+                    by = .(rep)]
+# quantile
+res_q1 = d_res_dt[, lapply(.SD, function(x) {quantile(x)[1]}),
+                  .SDcols = 'd_s_SOC',
+                    by = .(rep)]
+res_q2 = d_res_dt[, lapply(.SD, function(x) {quantile(x)[2]}),
+                  .SDcols = 'd_s_SOC',
+                  by = .(rep)]
+res_q3 = d_res_dt[, lapply(.SD, function(x) {quantile(x)[3]}),
+                  .SDcols = 'd_s_SOC',
+                  by = .(rep)]
+res_q4 = d_res_dt[, lapply(.SD, function(x) {quantile(x)[4]}),
+                  .SDcols = 'd_s_SOC',
+                  by = .(rep)]
+res_q5 = d_res_dt[, lapply(.SD, function(x) {quantile(x)[5]}),
+                  .SDcols = 'd_s_SOC',
+                  by = .(rep)]
+# combine statistics dt
+res_stats = rbind(res_mean[,   stat := 'mean'],
+                  res_median[, stat := 'median'],
+                  res_q1[,     stat := 'min'],
+                  res_q2[,     stat := '25th'],
+                  res_q4[,     stat := '75th'],
+                  res_q5[,     stat := 'max'])
+#----------------------------------------------------------------
+# ADD regions
+#----------------------------------------------------------------
+r_shp   = st_read(paste(shp_p, 'WB_countries_Admin0_10m.shp', sep = '/'))
+r       = rast(paste(b_path, 'msw-cropland-rf-ir-area.tif', sep = '/'))
+r       = r[[1]]
+create_WB_cty = function(shp_f, rst) {
+  # ORIGINAL WB NAME and OBJECTID
+  shp_dt          = setDT(as.data.table(st_drop_geometry(shp_f)))
+  # MATCH resolution of simulation data, dimensions the same
+  target.r    = rst
+  # CONFIRM SHP in same crs as target
+  country.sf  = st_transform(shp_f, crs(target.r))
+  country_r   = terra::rasterize(
+    x         = vect(country.sf),
+    y         = target.r,
+    field     = "OBJECTID",
+    touches   = TRUE          # optional: include cells touched by polygons
+  )
+  # CREATE data.frame, merge
+  new_shp_dt  = as.data.frame(country_r, cells = TRUE, xy = TRUE)
+  new_shp_dt  = setDT(new_shp_dt) # data.table object
+  # GET WB names to match to ID
+  shp_names   = data.table(WB_NAME   = shp_dt$WB_NAME,
+                           ID        = shp_dt$OBJECTID)
+  # JOIN with WB names
+  new_shp_dt  = new_shp_dt[shp_names, on = .(OBJECTID = ID)]  
+  return(new_shp_dt)
+}
+WB_dt = create_WB_cty(r_shp, r)
+# join
+d_res_dt = d_res_dt[WB_dt[,c('cell', 'WB_NAME')], on = .(gridid = cell)]
+d_res_dt = d_res_dt[!is.na(crop)]
+setorder(d_res_dt, gridid)
+gc()
+#----------------------------------------------------------------
+# US statistics
+#----------------------------------------------------------------
+US_d_res_dt = d_res_dt[WB_NAME == 'United States of America']
+# mean
+US_res_mean = US_d_res_dt[, lapply(.SD, mean), .SDcols = 'd_s_SOC',
+                    by = .(rep)]
+# median
+US_res_median = US_d_res_dt[, lapply(.SD, median), .SDcols = 'd_s_SOC',
+                      by = .(rep)]
+# quantile
+US_res_q1     = US_d_res_dt[, lapply(.SD, function(x) {quantile(x)[1]}),
+                  .SDcols = 'd_s_SOC',
+                  by = .(rep)]
+US_res_q2     = US_d_res_dt[, lapply(.SD, function(x) {quantile(x)[2]}),
+                  .SDcols = 'd_s_SOC',
+                  by = .(rep)]
+US_res_q4     = US_d_res_dt[, lapply(.SD, function(x) {quantile(x)[4]}),
+                  .SDcols = 'd_s_SOC',
+                  by = .(rep)]
+US_res_q5     = US_d_res_dt[, lapply(.SD, function(x) {quantile(x)[5]}),
+                  .SDcols = 'd_s_SOC',
+                  by = .(rep)]
+# combine statistics dt
+US_res_stats = rbind(US_res_mean[,   stat := 'mean'],
+                     US_res_median[, stat := 'median'],
+                     US_res_q1[,     stat := 'min'],
+                     US_res_q2[,     stat := '25th'],
+                     US_res_q4[,     stat := '75th'],
+                     US_res_q5[,     stat := 'max'])
+#----------------------------------------------------------------
+# Brazil statistics
+#----------------------------------------------------------------
+BR_d_res_dt = d_res_dt[WB_NAME == 'Brazil']
+# mean
+BR_res_mean = BR_d_res_dt[, lapply(.SD, mean), .SDcols = 'd_s_SOC',
+                          by = .(rep)]
+# median
+BR_res_median = BR_d_res_dt[, lapply(.SD, median), .SDcols = 'd_s_SOC',
+                            by = .(rep)]
+# quantile
+BR_res_q1     = BR_d_res_dt[, lapply(.SD, function(x) {quantile(x)[1]}),
+                            .SDcols = 'd_s_SOC',
+                            by = .(rep)]
+BR_res_q2     = BR_d_res_dt[, lapply(.SD, function(x) {quantile(x)[2]}),
+                            .SDcols = 'd_s_SOC',
+                            by = .(rep)]
+BR_res_q4     = BR_d_res_dt[, lapply(.SD, function(x) {quantile(x)[4]}),
+                            .SDcols = 'd_s_SOC',
+                            by = .(rep)]
+BR_res_q5     = BR_d_res_dt[, lapply(.SD, function(x) {quantile(x)[5]}),
+                            .SDcols = 'd_s_SOC',
+                            by = .(rep)]
+# combine statistics dt
+BR_res_stats = rbind(BR_res_mean[,   stat := 'mean'],
+                     BR_res_median[, stat := 'median'],
+                     BR_res_q1[,     stat := 'min'],
+                     BR_res_q2[,     stat := '25th'],
+                     BR_res_q4[,     stat := '75th'],
+                     BR_res_q5[,     stat := 'max'])
+#----------------------------------------------------------------
+# create ridgeline plots
+#----------------------------------------------------------------
+# GLOBAL, ALL CROPS, IRR
+# order
+res_stats$stat = factor(res_stats$stat, levels = c('min', '25th', 'mean', 'median','75th', 'max'))
+stat_label     = c('Minimum', '25th Percentile', 'Mean', 'Median', '75th Percentile', 'Maximum')
 
+# annual values
+t_period     = 21L
+CO2e_C       = (44/12)
+s_flip       = -1L
+# Violin plot
+# Combine scale + bandwidth
+# scale: reduce the height and overlap of the ridges
+# bandwidth: Higher bandwidth = smoother, lower peaks
+ggplot(res_stats, aes(x = (((d_s_SOC)/t_period)/CO2e_C)*s_flip, y = stat, fill = stat)) +
+  geom_density_ridges(alpha = 0.7, scale = 0.6, rel_min_height = 0.005,
+                      bandwidth = 0.03) +
+  geom_vline(xintercept = 0, linetype = "solid", color = "black") +
+  scale_y_discrete(expand = c(0.01, 0), 
+                   labels = stat_label) +
+  scale_x_continuous(breaks = seq(-0.25, 3, by = 0.25)) +  # Every 0.25
+  labs(title = "Uncertainty in Soil Carbon Change Statistics, 20-years",
+       subtitle = "Distribution across 1001 Monte Carlo iterations",
+       x = "Global Soil Carbon Change (Mg C ha-1 yr-1)",
+       y = "Summary Statistic") +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 14),
+        axis.text   = element_text(size = 12),
+        plot.title = element_text(size = 18),
+        plot.subtitle = element_text(size = 16))
+# US, ALL CROPS, IRR
+# order
+US_res_stats$stat = factor(US_res_stats$stat, levels = c('min', '25th', 'mean', 'median','75th', 'max'))
+stat_label     = c('Minimum', '25th Percentile', 'Mean', 'Median', '75th Percentile', 'Maximum')
+
+# annual values
+t_period     = 21L
+CO2e_C       = (44/12)
+# Violin plot
+# Combine scale + bandwidth
+# scale: reduce the height and overlap of the ridges
+# bandwidth: Higher bandwidth = smoother, lower peaks
+ggplot(US_res_stats, aes(x = (((d_s_SOC)/t_period)/CO2e_C)*s_flip, y = stat, fill = stat)) +
+  geom_density_ridges(alpha = 0.7, scale = 0.6, rel_min_height = 0.005,
+                      bandwidth = 0.03) +
+  geom_vline(xintercept = 0, linetype = "solid", color = "black") +
+  scale_y_discrete(expand = c(0.01, 0), 
+                   labels = stat_label) +
+  scale_x_continuous(breaks = seq(-0.1, 1, by = 0.1)) +  # Every 0.1
+  labs(title = "Uncertainty in Soil Carbon Change Statistics, 20-years",
+       subtitle = "Distribution across 1001 Monte Carlo iterations",
+       x = "U.S. Soil Carbon Change (Mg C ha-1 yr-1)",
+       y = "Summary Statistic") +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 14),
+        axis.text   = element_text(size = 12),
+        plot.title = element_text(size = 18),
+        plot.subtitle = element_text(size = 16))
+
+# BRAZIL, ALL CROPS, IRR
+# order
+BR_res_stats$stat = factor(BR_res_stats$stat, levels = c('min', '25th', 'mean', 'median','75th', 'max'))
+stat_label     = c('Minimum', '25th Percentile', 'Mean', 'Median', '75th Percentile', 'Maximum')
+
+# annual values
+t_period     = 21L
+CO2e_C       = (44/12)
+# Violin plot
+# Combine scale + bandwidth
+# scale: reduce the height and overlap of the ridges
+# bandwidth: Higher bandwidth = smoother, lower peaks
+ggplot(BR_res_stats, aes(x = (((d_s_SOC)/t_period)/CO2e_C)*s_flip, y = stat, fill = stat)) +
+  geom_density_ridges(alpha = 0.7, scale = 0.6, rel_min_height = 0.005,
+                      bandwidth = 0.03) +
+  geom_vline(xintercept = 0, linetype = "solid", color = "black") +
+  scale_y_discrete(expand = c(0.01, 0), 
+                   labels = stat_label) +
+  scale_x_continuous(breaks = seq(-0.25, 3, by = 0.25)) +  # Every 0.25
+  labs(title = "Uncertainty in Soil Carbon Change Statistics, 20-years",
+       subtitle = "Distribution across 1001 Monte Carlo iterations",
+       x = "Brazil Soil Carbon Change (Mg C ha-1 yr-1)",
+       y = "Summary Statistic") +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 14),
+        axis.text   = element_text(size = 12),
+        plot.title = element_text(size = 18),
+        plot.subtitle = element_text(size = 16))
+#----------------------------------------------------------------
+# CDF / PDF
+#----------------------------------------------------------------
+# # Pool all data across iterations for the full distribution
+# all_data = d_res_dt[, .(d_s_SOC)]
+# 
+# # CDF plot
+# ggplot(all_data, aes(x = ((d_s_SOC)/t_period)/CO2e_C)) +
+#   stat_ecdf(geom = "step", linewidth = 1, color = "steelblue") +
+#   geom_vline(xintercept = 0, linetype = "dashed", color = "red", linewidth = 0.8) +
+#   geom_hline(yintercept = c(0.05, 0.5, 0.95), 
+#              linetype = "dotted", color = "gray50", alpha = 0.6) +
+#   annotate("text", x = min(all_data$d_s_SOC) * 0.9, y = 0.05, 
+#            label = "5th percentile", hjust = 0, size = 3) +
+#   annotate("text", x = min(all_data$d_s_SOC) * 0.9, y = 0.5, 
+#            label = "Median", hjust = 0, size = 3) +
+#   annotate("text", x = min(all_data$d_s_SOC) * 0.9, y = 0.95, 
+#            label = "95th percentile", hjust = 0, size = 3) +
+#   scale_y_continuous(labels = scales::percent_format()) +
+#   labs(title = "Cumulative Distribution of Soil Carbon Change",
+#        subtitle = "Pooled across all Monte Carlo iterations",
+#        x = "Soil Carbon Change (Mg C/ha)",
+#        y = "Cumulative Probability") +
+#   theme_minimal() +
+#   theme(panel.grid.minor = element_blank())
+# 
+# 
+# # PDF with shaded tail regions (extremes)
+# 
+# # Calculate percentiles
+# p05 = quantile(all_data$d_s_SOC, 0.05)
+# p95 = quantile(all_data$d_s_SOC, 0.95)
+# 
+# # Get density for shading
+# dens = density(all_data$d_s_SOC)
+# dens_dt = data.table(x = dens$x, y = dens$y)
+# 
+# ggplot(all_data, aes(x = ((d_s_SOC)/t_period)/CO2e_C)) +
+#   # Shade lower 5% tail
+#   geom_area(data = dens_dt[x <= p05], 
+#             aes(x = x, y = y), fill = "red", alpha = 0.4) +
+#   # Shade upper 5% tail
+#   geom_area(data = dens_dt[x >= p95], 
+#             aes(x = x, y = y), fill = "darkgreen", alpha = 0.4) +
+#   geom_density(fill = "steelblue", alpha = 0.3, linewidth = 1) +
+#   geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+#   labs(title = "Probability Density of Soil Carbon Change",
+#        subtitle = "Shaded regions = worst 5% (red) and best 5% (green)",
+#        x = "Soil Carbon Change (Mg C/ha)",
+#        y = "Density") +
+#   theme_minimal()
 ```
 
