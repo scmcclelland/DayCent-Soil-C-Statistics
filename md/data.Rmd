@@ -9,20 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Overview of scenario and conv data
+## Overview
 
-```{r headers}
-# gridid     cell numbers
-# crop       maiz (maize), soyb (soybean), swht (spring wheat), wwht (winter wheat)
-# irr        0 (rainfed), 1 (irrigated)
-# scenario   scenario compared to BAU
-# ssp        historical
-# gcm        historical
-# rep        monte carlo iteration number
-# d_s_SOC    SOC (soil carbon) response, Mg CO2-eq ha-1
-#
-# Positive responses = higher emissions
-# Negative responses = mitigation or emissions reductions
-# Note that wwht will not occur in any cover crop scenario
-```
+to be completed.
 
