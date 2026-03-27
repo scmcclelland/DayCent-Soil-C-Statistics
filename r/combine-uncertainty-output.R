@@ -1,6 +1,6 @@
 # file name:    combine-uncertainty-output.R
 # created:      20 January 2026
-# last updated: 06 March 2026
+# last updated: 27 March 2026
 # author:       S.C. McClelland
 
 # description: This file combines uncertainty output by scenario.
@@ -31,6 +31,11 @@ u_data    = paste0(dir, '/data/uncertainty-output/', args[2])
 # LOAD FILES by crop, irrigation
 #-------------------------------------------------------------------------------
 dt_somsc = list.files(u_data, args[1], full.names = TRUE)
+if(args[1] == 'uncertainty-ntill') {dt_somsc = dt_somsc[!dt_somsc %like% 'res']}
+if(args[1] == 'uncertainty-ccg') {dt_somsc   = dt_somsc[!dt_somsc %like% 'res']
+                                  dt_somsc   = dt_somsc[!dt_somsc %like% 'ntill']}
+if(args[1] == 'uncertainty-ccl') {dt_somsc   = dt_somsc[!dt_somsc %like% 'res']
+                                  dt_somsc   = dt_somsc[!dt_somsc %like% 'ntill']}
 dt_somsc = lapply(dt_somsc, fread)
 dt_somsc = rbindlist(dt_somsc)
 gc()
