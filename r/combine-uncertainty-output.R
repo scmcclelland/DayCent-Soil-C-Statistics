@@ -14,7 +14,7 @@ library(stringr)
 # ARGS
 #-------------------------------------------------------------------------------
 args   = commandArgs(trailingOnly = TRUE)
-if (isFALSE(length(args) == 1))
+if (isFALSE(length(args) == 2))
   stop(
     'Needs 2 command-line argument (scenario selection).'
   )
@@ -38,4 +38,4 @@ gc()
 # SAVE FILE
 #-------------------------------------------------------------------------------
 # save as Rdata
-save(dt_somsc, file = paste0(u_data, '/',args[1],'-somsc-uncertainty.RData'))
+save(dt_somsc, file = paste0(u_data, '/merged/',args[1],'-somsc.RData'))
