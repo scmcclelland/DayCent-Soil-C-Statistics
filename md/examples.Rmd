@@ -11,8 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Overview
 
-Example code snippets for analysis scripts are available here. A full script
-example is available at the end of this document.
+Example code snippets for analysis scripts are available here. A full script example is available at the end of this document.
 
 ### Estimating change in soil organic carbon
 
@@ -66,9 +65,7 @@ dt_q2 = dt[, lapply(.SD, function(x) {quantile(x)[2]}),
 
 ### Full example
 
-This is an example script for estimating statistics and visualizing data. It 
-provides an example for global and two country-level estimates. We will also 
-need to add in soil and environmental features for additional analyses (TBD).
+This is an example script for estimating statistics and visualizing data. It provides an example for global and two country-level estimates. We will also need to add in soil and environmental features for additional analyses (TBD).
 
 The PDF and CDF approach will also need to be refined further.
 
@@ -388,4 +385,3 @@ ggplot(BR_res_stats, aes(x = (((d_s_SOC)/t_period)/CO2e_C)*s_flip, y = stat, fil
 #        y = "Density") +
 #   theme_minimal()
 ```
-
