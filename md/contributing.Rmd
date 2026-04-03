@@ -85,6 +85,10 @@ gh pr create --base main --head feature/<initials>-short-desc --fill
 ### Avoiding conflicts
 
 ```{bash conflicts}
+# at load, set user name and email
+git config user.name "Your Name"
+git config user.email "your_email@example.com"
+
 # stay up-to-date with main
 git checkout main
 git pull origin main
