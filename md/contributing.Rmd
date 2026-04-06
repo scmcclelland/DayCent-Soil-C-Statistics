@@ -98,8 +98,18 @@ git pull origin main
 git checkout feature/<initials>-short-desc
 git merge main
 # If conflict occurs
+# Option 1: --ours or --theirs
+# works well if one version is clearly correct and you don't need to combine changes
+# keep your version (if that is correct option)
+git checkout --ours <file>
+git add <file>
+# keep main's version (if that is correct option)
+git checkout --theirs <file>
+git add <file>
+# Option 2:
 code .
 # Open conflicted files, using VS code, resolve in an editor
+# However, to use on HPC requires specific set-up
 # Should offer easy options using buttons at top
 # One time set-up
 git config --global core.editor "code --wait"
