@@ -17,6 +17,8 @@ Users should follow the guidelines in this document for creating branches from m
 
 -   Never commit directly to main.
 
+-   Always checkout main at beginning of a session.
+
 -   One branch per task.
 
 -   Push branch, open PR early, update PR with more commits.
@@ -77,9 +79,10 @@ git commit -m "Short, specific message"
 # push
 git push -u origin feature/<initials>-short-desc
 #
-# then open PR (CLI or web UI)
-gh pr create --base main --head feature/<initials>-short-desc --fill
+# then open PR using the web UI
+# go to "Pull requests," open, and assign to PI for review
 # review and address any comments, continue to push to the same branch
+# if building out the same feature
 ```
 
 ### Avoiding conflicts
@@ -95,8 +98,14 @@ git pull origin main
 git checkout feature/<initials>-short-desc
 git merge main
 # If conflict occurs
-# Open conflicted files, resolve markers <<<<<< / ====== / >>>>>>
-# then:
+code .
+# Open conflicted files, using VS code, resolve in an editor
+# Should offer easy options using buttons at top
+# One time set-up
+git config --global core.editor "code --wait"
+git config --global merge.tool vscode
+# Refer to Google doc for set-up process, need SSH key
+# Then:
 git add <resolved_files>
 git commit -m "Resolve merge conflicts with main"
 git push
