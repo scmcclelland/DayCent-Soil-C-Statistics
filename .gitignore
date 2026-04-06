@@ -59,3 +59,7 @@ bash/process-model-output-array-test.slurm
 
 # Deprecated scripts
 bash/deprecated/
+bash/
+data/
+logs/
+AGENTS.md
