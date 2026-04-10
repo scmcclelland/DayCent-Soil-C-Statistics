@@ -19,7 +19,7 @@ library(ggridges)
 #-------------------------------------------------------------------------------
 args     = commandArgs(trailingOnly = TRUE) 
 #these can be updated for different scenarios
-args[1] <- 'ntill-res'
+args[1] <- 'ccg-ntill'
 args[2] <- '10-yr'
 args[3] <- '/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data/analysis-input'
 args[4] <- "delta-cumulative-SOC-"
@@ -42,6 +42,7 @@ o_dir <- paste(args[3], args[2], sep = '/')
 #-------------------------------------------------------------------------------
 
 load(paste0(args[3], "/", args[2], "/", args[4], args[1],".RData")) # dt_scenario in GE
+
 #-------------------------------------------------------------------------------
 # stats
 #-------------------------------------------------------------------------------
@@ -72,10 +73,11 @@ dt_long <- melt(dt_scenario_stats,
 
 #ridgeline plot
 ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
-  geom_density_ridges(alpha = 0.6, rel_min_height = 0.01, #cut off lines <0.1%
-                      color = "gray20", linewidth = 0.4) +
+  geom_density_ridges(alpha = 0.6, rel_min_height = 0.01,
+                      color = "gray20", linewidth = 0.4,
+                      bandwidth = 0.05) +
   scale_fill_manual(values = linecols) +
-  labs(x = paste0("Annual Mg/ha SOC Sequestration Over 10 Years (", args[1], ")"),
+  labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Sequestration Over 10 Years ("*.(args[1])*")"),
        y = NULL,
        title = "Distribution of Summary Statistics",
        subtitle = paste0("Scenario - ", args[1]),
@@ -84,6 +86,7 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
   theme(
     legend.position    = "none",
     plot.title         = element_text(size = 13, face = "bold"),
+    plot.subtitle      = element_text(size = 11),
     plot.caption       = element_text(size = 8, color = "grey50"),
     axis.text          = element_text(size = 10),
     axis.title.x       = element_text(size = 11),
@@ -91,32 +94,51 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
     plot.background    = element_rect(fill = "white", color = NA),
     plot.margin        = margin(15, 15, 10, 10)
   )
+#create a filename to save this plot as
+fname_ridgeline <- paste("Ridgeline", args[2], args[1], sep = "_")
 
 #PDF
 ggplot(dt_scenario, aes(x = d_s_SOC)) +
   geom_density(fill = "#4e9d7e", color = "#2d6e56",
-               alpha = 0.6, linewidth = 0.8) +
-  #geom_rug(alpha = 0.3, length = unit(0.03, "npc")) +
+               alpha = 0.6, linewidth = 0.8,
+               adjust = 2) +
   labs(title = "PDF: Soil Carbon Change Distribution",
        subtitle = paste("Scenario:", args[1]),
-       x = "Soil Carbon Change (Mg C/ha)",
+       x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
        y = "Probability Density") +
   theme_minimal(base_size = 13) +
-  theme(panel.grid.minor = element_blank(),
-        plot.title = element_text(face = "bold"),
-        axis.line = element_line(color = "grey70"))
+  theme(
+    panel.grid.minor   = element_blank(),
+    plot.title         = element_text(size = 13, face = "bold"),
+    plot.subtitle      = element_text(size = 11),
+    axis.text          = element_text(size = 10),
+    axis.title         = element_text(size = 11),
+    axis.line          = element_line(color = "grey70"),
+    plot.background    = element_rect(fill = "white", color = NA),
+    plot.margin        = margin(15, 15, 10, 10)
+  )
+#create a filename for saving
+fname_PDF <- paste("Prob_Dens", args[2], args[1], sep = "_")
 
-# CDF - shows cumulative probabilities
+# CDF
 ggplot(dt_scenario, aes(x = d_s_SOC)) +
   stat_ecdf(geom = "step", linewidth = 1.2, color = "#2d6e56") +
-  #geom_vline(xintercept = 0.5, linetype = "dashed", color = "lightgreen", linewidth = 0.8) +
   geom_hline(yintercept = c(0.05, 0.5, 0.95),
              linetype = "dotted", color = "gray50", alpha = 0.6) +
   scale_y_continuous(labels = scales::percent_format()) +
   labs(title = "CDF: Soil Carbon Change Distribution",
        subtitle = paste("Scenario:", args[1]),
-       x = "Soil Carbon Change (Mg C/ha)",
+       x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
        y = "Cumulative Probability") +
-  theme_bw()
-
+  theme_bw() +
+  theme(
+    plot.title         = element_text(size = 13, face = "bold"),
+    plot.subtitle      = element_text(size = 11),
+    axis.text          = element_text(size = 10),
+    axis.title         = element_text(size = 11),
+    plot.background    = element_rect(fill = "white", color = NA),
+    plot.margin        = margin(15, 15, 10, 10)
+  )
+#file name for saving
+fname_CDF <- paste("Cumul_Dens", args[2], args[1], sep = "_")
 
