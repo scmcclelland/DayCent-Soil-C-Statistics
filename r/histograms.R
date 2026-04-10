@@ -1,75 +1,122 @@
 # filename:     histograms.R    
 # created:      03 April 2026
-# last updated: 06 April 2026
+# last updated: 09 April 2026
 # author:       Docker Clark
 
-# description: This script produces a histogram for the ccg-ntill scenario on a 10 year timescale
+# description: This script computes statistics and makes a histogram for scenarios on a 10 or 20-yr timescale.
 #-------------------------------------------------------------------------------
-# libraries
+# libraries 
 #-------------------------------------------------------------------------------
 
 library(data.table)
+library(rstudioapi)
+library(ggplot2)
+library(stringr)
+library(ggridges)
+
+#-------------------------------------------------------------------------------
+# directories and startup 
+#-------------------------------------------------------------------------------
+args     = commandArgs(trailingOnly = TRUE) 
+#these can be updated for different scenarios
+args[1] <- 'ntill-res'
+args[2] <- '10-yr'
+args[3] <- '/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data/analysis-input'
+args[4] <- "delta-cumulative-SOC-"
+#check if there's enough info to get a filepath
+#if (isFALSE(length(args) == 4)) stop( 'Needs 3 command-line argument (scenario selection, timeframe, data path).' )
+
+#get current directory (dir)
+dir = dirname(getActiveDocumentContext()$path) 
+dir = str_split(dir, '/r') 
+dir = dir[[1]][1] 
+setwd(dir) # set as working directory
+
+#set input data directory
+d_dir <- paste(args[3], args[2], sep = '/')
+#set output data directory
+o_dir <- paste(args[3], args[2], sep = '/')
 
 #-------------------------------------------------------------------------------
 # read in data
 #-------------------------------------------------------------------------------
-# TODO this should not be hard-coded as it as now 
-#d_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data/analysis-input/10-yr/delta-cumulative-SOC-ccg-ntill.RData"
 
-base_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data/analysis-input/10-yr"
-scenario <- "delta-cumulative-SOC-ccg-ntill.RData"
-load(paste(base_path, scenario, sep = "/")) # dt_scenario in GE
-
+load(paste0(args[3], "/", args[2], "/", args[4], args[1],".RData")) # dt_scenario in GE
 #-------------------------------------------------------------------------------
 # stats
 #-------------------------------------------------------------------------------
-ccg_ntill_stats <- dt_scenario[, .(
-  mean = mean(d_s_SOC),
-  P0 = min(d_s_SOC),
+#annualize SOC 
+dt_scenario[, d_s_SOC := d_s_SOC / 10]
+
+dt_scenario_stats <- dt_scenario[, .(
+  Min = min(d_s_SOC),
   P25 = quantile(d_s_SOC, probs = 0.25),
-  P50 = quantile(d_s_SOC, probs = 0.50),
+  Median = quantile(d_s_SOC, probs = 0.50),
+  Mean = mean(d_s_SOC),
   P75 = quantile(d_s_SOC, probs = 0.75),
-  P100 = max(d_s_SOC)), 
+  Max = max(d_s_SOC)), 
   by = .(rep)] 
 
-# Compute deciles
-quants <- seq(0, 1, by = 0.1)
 #-------------------------------------------------------------------------------
 # plots
 #-------------------------------------------------------------------------------
-# defining x axis range (range of all values except "rep")
-x_range <- range(ccg_ntill_stats[, .SD, .SDcols = !c("rep")])
+linecols <- viridis::viridis(6)
+#PDFs of summary stats as a ridgeline plot
 
-# Density lines
-plot(NULL, xlim = x_range, ylim = c(0, 3),
-     xlab = "10-year SOC Sequestration (Mg/ha)", ylab = "Density",
-     main = "Distribution of 1001 MC Summary Statistics (ccg-ntill)")
-{
-  lines(density(ccg_ntill_stats$mean), col = "black")
-  lines(density(ccg_ntill_stats$P0),   col = "blue")
-  lines(density(ccg_ntill_stats$P25),  col = "green")
-  lines(density(ccg_ntill_stats$P50),  col = "orange")
-  lines(density(ccg_ntill_stats$P75),  col = "red")
-  lines(density(ccg_ntill_stats$P100), col = "purple")
-  
-}
-legend("topright", legend = c("Mean", "Min", "25th", "Median", "75th", "Max"),
-       col = c("black", "blue", "green", "orange", "red", "purple"), lty = 1)
+#make data long for read-in to ggplot
+dt_long <- melt(dt_scenario_stats, 
+                measure.vars = setdiff(colnames(dt_scenario_stats), "rep"),
+                variable.name = "statistic",
+                value.name = "SOC")
 
 
-# Overlapping hists #IN PROGRESS
-plot(NULL, xlim = x_range, ylim = c(0, 70),
-     xlab = "d_s_SOC", ylab = "Frequency",
-     main = "Distribution of 1001 MC Summary Statistics (ccg-ntill)")
+#ridgeline plot
+ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
+  geom_density_ridges(alpha = 0.6, rel_min_height = 0.01, #cut off lines <0.1%
+                      color = "gray20", linewidth = 0.4) +
+  scale_fill_manual(values = linecols) +
+  labs(x = paste0("Annual Mg/ha SOC Sequestration Over 10 Years (", args[1], ")"),
+       y = NULL,
+       title = "Distribution of Summary Statistics",
+       subtitle = paste0("Scenario - ", args[1]),
+       caption = "Variation from 1,001 Monte Carlo draws") +
+  theme_ridges(font_family = "sans") +
+  theme(
+    legend.position    = "none",
+    plot.title         = element_text(size = 13, face = "bold"),
+    plot.caption       = element_text(size = 8, color = "grey50"),
+    axis.text          = element_text(size = 10),
+    axis.title.x       = element_text(size = 11),
+    panel.grid.major.x = element_line(color = "grey90"),
+    plot.background    = element_rect(fill = "white", color = NA),
+    plot.margin        = margin(15, 15, 10, 10)
+  )
 
-hist(ccg_ntill_stats$mean, col = adjustcolor("black",  alpha.f = 0.3), add = TRUE)
-hist(ccg_ntill_stats$P0,   col = adjustcolor("blue",   alpha.f = 0.3), add = TRUE)
-hist(ccg_ntill_stats$P25,  col = adjustcolor("green",  alpha.f = 0.3), add = TRUE)
-hist(ccg_ntill_stats$P50,  col = adjustcolor("orange", alpha.f = 0.3), add = TRUE)
-hist(ccg_ntill_stats$P75,  col = adjustcolor("red",    alpha.f = 0.3), add = TRUE)
-hist(ccg_ntill_stats$P100, col = adjustcolor("purple", alpha.f = 0.3), add = TRUE, breaks = 50)
+#PDF
+ggplot(dt_scenario, aes(x = d_s_SOC)) +
+  geom_density(fill = "#4e9d7e", color = "#2d6e56",
+               alpha = 0.6, linewidth = 0.8) +
+  #geom_rug(alpha = 0.3, length = unit(0.03, "npc")) +
+  labs(title = "PDF: Soil Carbon Change Distribution",
+       subtitle = paste("Scenario:", args[1]),
+       x = "Soil Carbon Change (Mg C/ha)",
+       y = "Probability Density") +
+  theme_minimal(base_size = 13) +
+  theme(panel.grid.minor = element_blank(),
+        plot.title = element_text(face = "bold"),
+        axis.line = element_line(color = "grey70"))
 
-legend("topright", legend = c("Mean", "P0", "P25", "P50", "P75", "P100"),
-       col = c("black", "blue", "green", "orange", "red", "purple"),
-       pch = 15)
+# CDF - shows cumulative probabilities
+ggplot(dt_scenario, aes(x = d_s_SOC)) +
+  stat_ecdf(geom = "step", linewidth = 1.2, color = "#2d6e56") +
+  #geom_vline(xintercept = 0.5, linetype = "dashed", color = "lightgreen", linewidth = 0.8) +
+  geom_hline(yintercept = c(0.05, 0.5, 0.95),
+             linetype = "dotted", color = "gray50", alpha = 0.6) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "CDF: Soil Carbon Change Distribution",
+       subtitle = paste("Scenario:", args[1]),
+       x = "Soil Carbon Change (Mg C/ha)",
+       y = "Cumulative Probability") +
+  theme_bw()
+
 
