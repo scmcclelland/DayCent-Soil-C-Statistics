@@ -19,7 +19,7 @@ library(ggridges)
 #-------------------------------------------------------------------------------
 args     = commandArgs(trailingOnly = TRUE) 
 #these can be updated for different scenarios
-args[1] <- 'ccl-ntill'
+args[1] <- 'ntill-res'
 args[2] <- '20-yr'
 args[3] <- '/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data'
 args[4] <- 'analysis-input'
@@ -122,6 +122,9 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
                       color = "gray20", linewidth = 0.4,
                       bandwidth = 0.035) + #binwidth for smoothing
   scale_fill_manual(values = linecols) +
+  scale_x_continuous(
+    breaks = seq(-1, 4, by = 0.5),
+    limits = c(-1, 4)) +
   labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Sequestration Over" ~ .(yrs) ~ "Years"),
        y = NULL,
        title = "Distribution of Summary Statistics",
