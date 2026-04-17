@@ -1,6 +1,6 @@
 # filename:     histograms.R    
 # created:      03 April 2026
-# last updated: 10 April 2026
+# last updated: 17 April 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale.
@@ -19,8 +19,8 @@ library(ggridges)
 #-------------------------------------------------------------------------------
 args     = commandArgs(trailingOnly = TRUE) 
 #these can be updated for different scenarios
-args[1] <- 'ccg'
-args[2] <- '10-yr'
+args[1] <- 'ccl-ntill'
+args[2] <- '20-yr'
 args[3] <- '/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data'
 args[4] <- 'analysis-input'
 args[5] <- 'analysis-output'
@@ -40,7 +40,6 @@ d_dir <- paste(args[3], args[4], args[2], sep = '/')
 #set output data directory
 o_dir <- paste(args[3], args[5], args[2], sep = '/')
 
-
 #-------------------------------------------------------------------------------
 # read in data
 #-------------------------------------------------------------------------------
@@ -53,9 +52,10 @@ load(paste0(args[3], "/", args[4], "/",     #base file path
 # data manipulation
 #-------------------------------------------------------------------------------
 #annualize SOC 
-dt_scenario[, d_s_SOC := d_s_SOC / 10]
+yrs <- as.numeric(str_split(args[2], "-")[[1]][1])
+dt_scenario[, d_s_SOC := d_s_SOC / yrs]
 
-dt_stats <- dt_scenario[, .( # <<<FIRST CHANGE HERE
+dt_stats <- dt_scenario[, .(
   Min = min(d_s_SOC),
   P25 = quantile(d_s_SOC, probs = 0.25),
   Median = quantile(d_s_SOC, probs = 0.50),
@@ -91,9 +91,9 @@ dt_means_long <- melt(dt_scenario_means,
                       variable.name = "scenario",
                       value.name = "mean_SOC")
 dt_meds_long <- melt(dt_scenario_meds, 
-                      measure.vars = colnames(dt_scenario_meds),
-                      variable.name = "scenario",
-                      value.name = "med_SOC")
+                     measure.vars = colnames(dt_scenario_meds),
+                     variable.name = "scenario",
+                     value.name = "med_SOC")
 #-------------------------------------------------------------------------------
 # shared themes (visualization)
 #-------------------------------------------------------------------------------
@@ -114,8 +114,6 @@ scenario_labels <- c(
   "ccl-ntill" = "Legume Cover Crop, No-Tillage & Full Residue Retention"
 )
 
-#would be a simple matter to save certain themes like those in plot.title
-#element_text(size = 13, face = "bold") for reuse in multiple plots
 #-------------------------------------------------------------------------------
 # ridgeline plot (summary stats)
 #-------------------------------------------------------------------------------
@@ -124,7 +122,7 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
                       color = "gray20", linewidth = 0.4,
                       bandwidth = 0.035) + #binwidth for smoothing
   scale_fill_manual(values = linecols) +
-  labs(x = expression("Mg ha"^-1~"y"^-1~"SOC Sequestration Over 10 Years"),
+  labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Sequestration Over" ~ .(yrs) ~ "Years"),
        y = NULL,
        title = "Distribution of Summary Statistics",
        subtitle = paste0("Scenario - ", scenario_labels[args[1]]),
@@ -156,7 +154,7 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
 # PDF: Probability Density Function
 #-------------------------------------------------------------------------------
 {#specify a probability range to highlight if desired. otherwise skip
-  prob_range <- ecdf_fn(0.5) - ecdf_fn(0.25)
+  prob_range <- ecdf_fn(0.1) - ecdf_fn(0.05)
   #precompute density so we can shade a region
   dens <- density(dt_scenario$d_s_SOC, adjust = 2)
   dens_dt <- data.table(x = dens$x, y = dens$y)
@@ -167,7 +165,7 @@ PDF.plot <- ggplot(dt_scenario, aes(x = d_s_SOC)) +
                alpha = 0.6, linewidth = 0.8,
                adjust = 2) +
   labs(title = "PDF: Soil Carbon Change Distribution",
-       subtitle = paste("Scenario:", scenario_labels[args[1]]),
+       subtitle = paste("Scenario:", scenario_labels[args[1]], "| Timescale:", yrs, "Years"),
        x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
        y = "Probability Density") +
   theme_minimal(base_size = 13) +
@@ -183,15 +181,15 @@ PDF.plot <- ggplot(dt_scenario, aes(x = d_s_SOC)) +
 if (exists("dens")) {
   PDF.plot <- PDF.plot +
     geom_ribbon(data = dens_dt[x >= 0.25 & x <= 0.5],
-               aes(x = x, ymin = 0, ymax = y),
-               fill = "#e8a020", alpha = 0.6) +
+                aes(x = x, ymin = 0, ymax = y),
+                fill = "#e8a020", alpha = 0.6) +
     annotate("text", x = 0.375, y = max(dens_dt[x >= 0.25 & x <= 0.5]$y) / 2,
              label = paste0("P = ", round(prob_range, 3)),
              size = 4, fontface = "bold") 
-    }
+}
 #call the plot
 PDF.plot
-  
+
 #create a filename for saving
 #fname_PDF <- paste("Prob_Dens", args[2], args[1], sep = "_")
 #save to output directory
@@ -205,14 +203,13 @@ PDF.plot
 #-------------------------------------------------------------------------------
 # CDF: Cumulative Density Function
 #-------------------------------------------------------------------------------
-# todo- add an option to choose a threshold to then mark on the CDF plot
 ggplot(dt_scenario, aes(x = d_s_SOC)) +
   stat_ecdf(geom = "step", linewidth = 1.2, color = "#2d6e56") +
   geom_hline(yintercept = c(0.05, 0.5, 0.95),
              linetype = "dotted", color = "gray50", alpha = 0.6) +
   scale_y_continuous(labels = scales::percent_format()) +
   labs(title = "CDF: Soil Carbon Change Distribution",
-       subtitle = paste("Scenario:", scenario_labels[args[1]]),
+       subtitle = paste("Scenario:", scenario_labels[args[1]], "| Timescale:", yrs, "Years"),
        x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
        y = "Cumulative Probability") +
   theme_bw() +
@@ -237,10 +234,11 @@ ggplot(dt_scenario, aes(x = d_s_SOC)) +
 #-------------------------------------------------------------------------------
 #Histograms
 #-------------------------------------------------------------------------------
+fillcols <- viridis::viridis(ncol(dt_scenario_means))
 #shared-axis hist of different scenario MEANS
 ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
   geom_histogram(alpha = 0.5, bins = 150, position = "identity") +
-  scale_fill_manual(values = linecols, labels = scenario_labels) +
+  scale_fill_manual(values = fillcols, labels = scenario_labels) +
   labs(x = expression("Mean SOC Sequestration (Mg ha"^-1~"yr"^-1*")"),
        y = "Frequency",
        fill = "Scenario",
@@ -264,7 +262,7 @@ ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
 #shared-axis hist of different scenario MEDIANS
 ggplot(dt_meds_long, aes(x = med_SOC, fill = scenario)) +
   geom_histogram(alpha = 0.5, bins = 150, position = "identity") +
-  scale_fill_manual(values = linecols, labels = scenario_labels) +
+  scale_fill_manual(values = fillcols, labels = scenario_labels) +
   labs(x = expression("Median SOC Sequestration (Mg ha"^-1~"yr"^-1*")"),
        y = "Frequency",
        fill = "Scenario",
@@ -289,5 +287,19 @@ ggplot(dt_meds_long, aes(x = med_SOC, fill = scenario)) +
 #-------------------------------------------------------------------------------
 #save the stats from each scenario to the output directory
 fwrite(x    = dt_stats,
-  file      = paste0(o_dir, "/", args[2], "_", args[1], "_stats.csv"),
-  sep       = ",")
+       file      = paste0(o_dir, "/", args[2], "_", args[1], "_stats.csv"),
+       sep       = ",")
+
+#save the mean / medians across scenarios
+if (isTRUE(ncol(dt_scenario_means) < 9)) {
+  stop("Warning: all scenario means not included")}
+if (isTRUE(ncol(dt_scenario_meds) < 9)) {
+  stop("Warning: all scenario meduabs not included")}
+
+#save to the output directory
+fwrite(x    = dt_scenario_means,
+       file      = paste0(o_dir, "/", args[2], "_scenario-wise-means.csv"),
+       sep       = ",")
+fwrite(x    = dt_scenario_meds,
+       file      = paste0(o_dir, "/", args[2], "_scenario-wise-medians.csv"),
+       sep       = ",")
