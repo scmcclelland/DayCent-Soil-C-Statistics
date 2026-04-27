@@ -150,6 +150,11 @@ if (nrow(dt_scenario[is.na(IPCC_NAME), .(WB_NAME, IPCC_NAME)]) > 0) {
   message("All countries captured.")
 }
 
+#-------------------------------------------------------------------------------
+# Sub-global filtering
+#-------------------------------------------------------------------------------
+# reset args[6] if desired
+args[6] <- "Oceania"
 #filtering for desired regions
 if (args[6] == "Global") {
   message("Global analysis")
@@ -238,7 +243,10 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
 # PDF: Probability Density Function
 #-------------------------------------------------------------------------------
 {#specify a probability range to highlight if desired. otherwise skip
-  prob_range <- ecdf_fn(0.1) - ecdf_fn(0.05)
+  #between x1 (lower bound) and x2 (upper bound)
+  x1 <- 0.5
+  x2 <- 0.75
+  prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
   #precompute density so we can shade a region
   dens <- density(dt_filtered$an_d_s_SOC, adjust = 2)
   dens_dt <- data.table(x = dens$x, y = dens$y)
@@ -261,13 +269,16 @@ PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
     axis.title         = element_text(size = 11),
     axis.line          = element_line(color = "grey70"),
     plot.background    = element_rect(fill = "white", color = NA),
-    plot.margin        = margin(15, 15, 10, 10))
+    plot.margin        = margin(15, 15, 10, 10)) +
+  scale_x_continuous(
+    breaks = seq(0, 3, by = 0.5),
+    limits = c(0, 3))
 if (exists("dens")) {
   PDF.plot <- PDF.plot +
-    geom_ribbon(data = dens_dt[x >= 0.25 & x <= 0.5],
+    geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
                 aes(x = x, ymin = 0, ymax = y),
                 fill = "#e8a020", alpha = 0.6) +
-    annotate("text", x = 0.375, y = max(dens_dt[x >= 0.25 & x <= 0.5]$y) / 2,
+    annotate("text", x = (x1 + x2) /2, y = max(dens_dt[x >= x1 & x <= x2]$y) / 2,
              label = paste0("P = ", round(prob_range, 3)),
              size = 4, fontface = "bold") 
 }
@@ -278,7 +289,7 @@ PDF.plot
 # CDF: Cumulative Density Function
 #-------------------------------------------------------------------------------
 #specify a threshold value to point out in an annotation
-soc.thresh <- (0.65)
+soc.thresh <- (0.5)
 cdf.line <- ecdf_fn(soc.thresh)
 
 CDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
@@ -297,11 +308,14 @@ CDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
     axis.text       = element_text(size = 10),
     axis.title      = element_text(size = 11),
     plot.background = element_rect(fill = "white", color = NA),
-    plot.margin     = margin(15, 15, 10, 10))
+    plot.margin     = margin(15, 15, 10, 10)) +
+  scale_x_continuous(
+    breaks = seq(0, 3, by = 0.5),
+    limits = c(0, 3))
 if (exists("soc.thresh")) {
   CDF.plot <- CDF.plot +
     annotate("segment", x = soc.thresh, xend = soc.thresh,
-             y = 0, yend = cdf.line,
+             y = -Inf, yend = cdf.line,
              linetype = "dashed", color = "#e8a020", linewidth = 0.8) +
     annotate("segment", x = -Inf, xend = soc.thresh,
              y = cdf.line, yend = cdf.line,
