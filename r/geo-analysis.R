@@ -153,37 +153,43 @@ if (nrow(dt_scenario[is.na(IPCC_NAME), .(WB_NAME, IPCC_NAME)]) > 0) {
 #-------------------------------------------------------------------------------
 # Sub-global filtering
 #-------------------------------------------------------------------------------
+regions <- list(
+  "North America" = c("United States of America", "Mexico", "Canada"),
+  "Oceania"       = c('Australia', 'New Zealand', 'Papua New Guinea', 'Solomon Islands',
+                      'Fiji', 'Vanuatu', 'Samoa', 'Tonga', 'Kiribati', 'Micronesia, Fed. Sts.',
+                      'Palau', 'Marshall Islands', 'Tuvalu', 'Nauru',
+                      'New Caledonia (Fr.)', 'French Polynesia (Fr.)', 'Guam (US)',
+                      'Northern Mariana Islands (US)', 'American Samoa (US)',
+                      'Cook Islands (NZ)', 'Niue (NZ)', 'Wallis and Futuna (Fr.)'),
+  "Europe"        = c('Albania', 'Andorra', 'Austria', 'Belarus', 'Belgium', 'Bosnia and Herzegovina',
+                      'Bulgaria', 'Croatia', 'Cyprus', 'Czech Republic', 'Denmark', 'Estonia',
+                      'Finland', 'France', 'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland',
+                      'Italy', 'Kosovo', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg',
+                      'Malta', 'Moldova', 'Monaco', 'Montenegro', 'Netherlands', 'North Macedonia',
+                      'Norway', 'Poland', 'Portugal', 'Romania', 'Russian Federation', 'San Marino',
+                      'Serbia', 'Slovak Republic', 'Slovenia', 'Spain', 'Sweden', 'Switzerland',
+                      'Ukraine', 'United Kingdom', 'Vatican City',
+                      'Faroe Islands (Den.)', 'Gibraltar (UK)', 'Guernsey (UK)', 'Isle of Man (UK)',
+                      'Jersey (UK)', 'Svalbard (Nor.)', 'Greenland (Den.)'),
+  "West Africa"   = c('Benin', 'Burkina Faso', 'Cabo Verde', "Côte d'Ivoire", "Gambia, The",
+                      'Ghana', 'Guinea', 'Guinea-Bissau', 'Liberia', 'Mali', 'Mauritania',
+                      'Niger', 'Nigeria', 'Senegal', 'Sierra Leone', 'Togo')
+)
+
 # reset args[6] if desired
-args[6] <- "Oceania"
+args[6] <- "China"
 #filtering for desired regions
 if (args[6] == "Global") {
-  message("Global analysis")
-} else if (args[6] == "North America") {
-  countries <- c("United States of America", "Mexico", "Canada")
-} else if (args[6] == "Oceania") {
-  countries <- c('Australia', 'New Zealand', 'Papua New Guinea', 'Solomon Islands',
-                 'Fiji', 'Vanuatu', 'Samoa', 'Tonga', 'Kiribati', 'Micronesia, Fed. Sts.',
-                 'Palau', 'Marshall Islands', 'Tuvalu', 'Nauru',
-                 'New Caledonia (Fr.)', 'French Polynesia (Fr.)', 'Guam (US)',
-                 'Northern Mariana Islands (US)', 'American Samoa (US)',
-                 'Cook Islands (NZ)', 'Niue (NZ)', 'Wallis and Futuna (Fr.)')
-} else if (args[6] == "Europe") {
-  countries <- c('Albania', 'Andorra', 'Austria', 'Belarus', 'Belgium', 'Bosnia and Herzegovina',
-                 'Bulgaria', 'Croatia', 'Cyprus', 'Czech Republic', 'Denmark', 'Estonia',
-                 'Finland', 'France', 'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland',
-                 'Italy', 'Kosovo', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg',
-                 'Malta', 'Moldova', 'Monaco', 'Montenegro', 'Netherlands', 'North Macedonia',
-                 'Norway', 'Poland', 'Portugal', 'Romania', 'Russian Federation', 'San Marino',
-                 'Serbia', 'Slovak Republic', 'Slovenia', 'Spain', 'Sweden', 'Switzerland',
-                 'Ukraine', 'United Kingdom', 'Vatican City',
-                 'Faroe Islands (Den.)', 'Gibraltar (UK)', 'Guernsey (UK)', 'Isle of Man (UK)',
-                 'Jersey (UK)', 'Svalbard (Nor.)', 'Greenland (Den.)')
-} else if (args[6] %in% dt_scenario$WB_NAME){
-  countries <- args[6] 
+  countries <- unique(dt_scenario$WB_NAME)
+} else if (args[6] %in% names(regions)) {
+  countries <- regions[[args[6]]]
+} else if (args[6] %in% dt_scenario$WB_NAME) {
+  countries <- args[6]
 } else {
-  countries <- NULL
   message(args[6], " not found in filter function")
+  countries <- NULL
 }
+
 dt_filtered <- dt_scenario[WB_NAME %in% countries, ]
 
 #a function which allows calculation of probabilities from PDFs and CDFs
