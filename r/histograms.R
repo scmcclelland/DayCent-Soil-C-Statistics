@@ -1,6 +1,6 @@
 # filename:     histograms.R    
 # created:      03 April 2026
-# last updated: 17 April 2026
+# last updated: 30 April 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale.
@@ -97,8 +97,11 @@ dt_meds_long <- melt(dt_scenario_meds,
 #-------------------------------------------------------------------------------
 # shared themes (visualization)
 #-------------------------------------------------------------------------------
-#color scheme
+#color schemes (continuous)
 linecols <- viridis::viridis(6)
+
+#color schemes (categorical)
+cat_cols <- c("#66C2A5","#FC8D62","#8DA0CB","#E78AC3","#A6D854","#FFD92F","#E5C494","#B3B3B3")
 
 #create a key for the scenario codes
 scenario_labels <- c(
@@ -157,7 +160,10 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
 # PDF: Probability Density Function
 #-------------------------------------------------------------------------------
 {#specify a probability range to highlight if desired. otherwise skip
-  prob_range <- ecdf_fn(0.1) - ecdf_fn(0.05)
+  #between x1 (lower bound) and x2 (upper bound)
+  x1 <- 0.5
+  x2 <- 0.75
+  prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
   #precompute density so we can shade a region
   dens <- density(dt_scenario$d_s_SOC, adjust = 2)
   dens_dt <- data.table(x = dens$x, y = dens$y)
@@ -183,12 +189,12 @@ PDF.plot <- ggplot(dt_scenario, aes(x = d_s_SOC)) +
     plot.margin        = margin(15, 15, 10, 10))
 if (exists("dens")) {
   PDF.plot <- PDF.plot +
-    geom_ribbon(data = dens_dt[x >= 0.25 & x <= 0.5],
-                aes(x = x, ymin = 0, ymax = y),
-                fill = "#e8a020", alpha = 0.6) +
-    annotate("text", x = 0.375, y = max(dens_dt[x >= 0.25 & x <= 0.5]$y) / 2,
+  geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
+              aes(x = x, ymin = 0, ymax = y),
+              fill = "#e8a020", alpha = 0.6) +
+    annotate("text", x = (x1 + x2) /2, y = max(dens_dt[x >= x1 & x <= x2]$y) / 2,
              label = paste0("P = ", round(prob_range, 3)),
-             size = 4, fontface = "bold") 
+             size = 4, fontface = "bold")
 }
 #call the plot
 PDF.plot
@@ -237,7 +243,7 @@ ggplot(dt_scenario, aes(x = d_s_SOC)) +
 #-------------------------------------------------------------------------------
 #Histograms
 #-------------------------------------------------------------------------------
-fillcols <- viridis::viridis(ncol(dt_scenario_means))
+fillcols <- cat_cols[1:ncol(dt_scenario_means)]
 #shared-axis hist of different scenario MEANS
 ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
   geom_histogram(alpha = 0.5, bins = 150, position = "identity") +
