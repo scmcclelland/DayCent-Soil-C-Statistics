@@ -1,9 +1,9 @@
 # filename:     geo-analysis.R    
 # created:      20 April 2026
-# last updated: 27 April 2026
+# last updated: 30 April 2026
 # author:       Docker Clark
 
-# description: 
+# description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales. 
 #-------------------------------------------------------------------------------
 # libraries 
 #-------------------------------------------------------------------------------
@@ -24,7 +24,7 @@ b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Stati
 args    <- commandArgs(trailingOnly = TRUE) 
 args[1] <- "analysis-input"
 args[2] <- "analysis-output"
-args[3] <- 'ccg-ntill'
+args[3] <- 'ccl'
 args[4] <- '20-yr'
 args[5] <- "delta-cumulative-SOC"
 args[6] <- "Europe"
@@ -102,11 +102,6 @@ gc() #garbage collection
 #----------------------------------------------------------------
 # ADD IPCC REGION NAMES
 #----------------------------------------------------------------
-# we may want to break out DEV (developed countries)
-# the DEV grouping doesn't make sense environmentally
-# for example, we might want 'North America' 'Europe' and 'Oceania'
-# it might make sense to merge some of those into existing groups
-# 
 # IPCC Region Names (AR6 & Roe et al. 2021)
 # Africa and Middle East
 AME   = c('Congo, Democratic Republic of', 'Nigeria', 'Tanzania', 'South Africa', 'Congo, Rep. of', 'Zambia',
@@ -134,6 +129,7 @@ EEWCA = c('Russian Federation', 'Kazakhstan', 'Belarus', 'Uzbekistan', 'Turkmeni
 LAC   = c('Brazil', 'Colombia', 'Mexico', 'Argentina', 'Bolivia', 'Peru', 'Venezuela', 'Paraguay', 'Ecuador', 'Chile', 'Guyana', 'Suriname',
           'Cuba', 'Uruguay', 'Honduras', 'Nicaragua', 'Guatemala', 'Guyana', 'Costa Rica', 'Panama', 'Dominican Republic', 'El Salvador', 'Belize',
           'Bahamas, The', 'Haiti', 'Turks and Caicos Islands (UK)', 'Jamaica', 'Venezuela, Republica Bolivariana de', 'Trinidad and Tobago')
+
 #creating IPCC names
 dt_scenario[WB_NAME %in% AME, IPCC_NAME   := 'AME']
 dt_scenario[WB_NAME %in% ADP, IPCC_NAME   := 'ADP']
@@ -173,11 +169,18 @@ regions <- list(
                       'Jersey (UK)', 'Svalbard (Nor.)', 'Greenland (Den.)'),
   "West Africa"   = c('Benin', 'Burkina Faso', 'Cabo Verde', "Côte d'Ivoire", "Gambia, The",
                       'Ghana', 'Guinea', 'Guinea-Bissau', 'Liberia', 'Mali', 'Mauritania',
-                      'Niger', 'Nigeria', 'Senegal', 'Sierra Leone', 'Togo')
+                      'Niger', 'Nigeria', 'Senegal', 'Sierra Leone', 'Togo'),
+  "European Union" =c('Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus',
+                      'Czech Republic', 'Denmark', 'Estonia', 'Finland', 'France',
+                      'Germany', 'Greece', 'Hungary', 'Ireland', 'Italy',
+                      'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
+                      'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
+                      'Spain', 'Sweden')
 )
 
 # reset args[6] if desired
-args[6] <- "China"
+args[6] <- "United States of America"
+
 #filtering for desired regions
 if (args[6] == "Global") {
   countries <- unique(dt_scenario$WB_NAME)
@@ -189,11 +192,12 @@ if (args[6] == "Global") {
   message(args[6], " not found in filter function")
   countries <- NULL
 }
-
+#filter according to countries
 dt_filtered <- dt_scenario[WB_NAME %in% countries, ]
 
 #a function which allows calculation of probabilities from PDFs and CDFs
 ecdf_fn <- ecdf(dt_filtered$an_d_s_SOC)
+
 #-------------------------------------------------------------------------------
 # Statistics
 #-------------------------------------------------------------------------------
@@ -207,18 +211,36 @@ dt_stats <- dt_filtered[, .(
   Max = max(an_d_s_SOC)), 
   by = .(rep)] 
 
+# Collect means across geographies for comparison
+if (!exists("dt_geo_means")) {
+  dt_geo_means <- dt_stats[, setNames(list(Mean), args[6])]
+  setDT(dt_geo_means)
+} else {
+  dt_geo_means[, (args[6]) := dt_stats$Mean]
+}
+
 #melt data to long for read-in to ggplot
 dt_long <- melt(dt_stats,
                 measure.vars = setdiff(colnames(dt_stats), "rep"),
                 variable.name = "statistic",
                 value.name = "SOC")
+
+dt_means_long <- melt(dt_geo_means, 
+                      measure.vars = colnames(dt_geo_means),
+                      variable.name = "scenario",
+                      value.name = "mean_SOC")
 #-------------------------------------------------------------------------------
-# Visualizations
+# Shared Themes
 #-------------------------------------------------------------------------------
-#Shared themes
-#color scheme
+#color schemes (continuous)
 linecols <- viridis::viridis(6)
-#Ridgelines
+
+#color schemes (categorical)
+cat_cols <- c("#66C2A5","#FC8D62","#8DA0CB","#E78AC3","#A6D854","#FFD92F","#E5C494","#B3B3B3")
+
+#-------------------------------------------------------------------------------
+# Sub-Global Ridgeline plot
+#-------------------------------------------------------------------------------
 ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
   geom_density_ridges(alpha = 0.6, rel_min_height = 0.01,
                       color = "gray20", linewidth = 0.4,
@@ -334,6 +356,24 @@ if (exists("soc.thresh")) {
 }
 #call the plot
 CDF.plot
+
+#-------------------------------------------------------------------------------
+# Histograms
+#-------------------------------------------------------------------------------
+fillcols <- cat_cols[1:ncol(dt_geo_means)]
+
+#shared-axis hist of different regions' MC means
+ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
+  geom_histogram(alpha = 0.7, bins = 150, position = "identity") +
+  scale_fill_manual(values = fillcols, labels = scenario_labels) +
+  labs(x = expression("Mean SOC Sequestration (Mg ha"^-1~"yr"^-1*")"),
+       y = "Frequency",
+       fill = "Region",
+       title = "Distribution of Monte Carlo Means") +
+  theme_classic() +
+  theme(legend.position = c(0.65, 0.75),
+        legend.background = element_rect(fill = "white", color = "grey90"))
+
 #-------------------------------------------------------------------------------
 # United States (contiguous) SOC map
 #-------------------------------------------------------------------------------
@@ -355,3 +395,7 @@ ggplot(dt_USA, aes(x = x, y = y, fill = an_d_s_SOC)) +
        y = "Latitude") +
   theme_minimal() +
   theme(legend.key.height = unit(2, "cm"))
+
+
+
+
