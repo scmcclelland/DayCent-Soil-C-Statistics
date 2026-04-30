@@ -24,8 +24,8 @@ b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Stati
 args    <- commandArgs(trailingOnly = TRUE) 
 args[1] <- "analysis-input"
 args[2] <- "analysis-output"
-args[3] <- 'ccl'
-args[4] <- '20-yr'
+args[3] <- "ccl"
+args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
 args[6] <- "Europe"
 
@@ -150,13 +150,8 @@ if (nrow(dt_scenario[is.na(IPCC_NAME), .(WB_NAME, IPCC_NAME)]) > 0) {
 # Sub-global filtering
 #-------------------------------------------------------------------------------
 regions <- list(
-  "North America" = c("United States of America", "Mexico", "Canada"),
-  "Oceania"       = c('Australia', 'New Zealand', 'Papua New Guinea', 'Solomon Islands',
-                      'Fiji', 'Vanuatu', 'Samoa', 'Tonga', 'Kiribati', 'Micronesia, Fed. Sts.',
-                      'Palau', 'Marshall Islands', 'Tuvalu', 'Nauru',
-                      'New Caledonia (Fr.)', 'French Polynesia (Fr.)', 'Guam (US)',
-                      'Northern Mariana Islands (US)', 'American Samoa (US)',
-                      'Cook Islands (NZ)', 'Niue (NZ)', 'Wallis and Futuna (Fr.)'),
+  "North America" = c("United States of America", "Canada"),
+  "Oceania"       = c('Australia', 'New Zealand'),
   "Europe"        = c('Albania', 'Andorra', 'Austria', 'Belarus', 'Belgium', 'Bosnia and Herzegovina',
                       'Bulgaria', 'Croatia', 'Cyprus', 'Czech Republic', 'Denmark', 'Estonia',
                       'Finland', 'France', 'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland',
@@ -167,9 +162,6 @@ regions <- list(
                       'Ukraine', 'United Kingdom', 'Vatican City',
                       'Faroe Islands (Den.)', 'Gibraltar (UK)', 'Guernsey (UK)', 'Isle of Man (UK)',
                       'Jersey (UK)', 'Svalbard (Nor.)', 'Greenland (Den.)'),
-  "West Africa"   = c('Benin', 'Burkina Faso', 'Cabo Verde', "Côte d'Ivoire", "Gambia, The",
-                      'Ghana', 'Guinea', 'Guinea-Bissau', 'Liberia', 'Mali', 'Mauritania',
-                      'Niger', 'Nigeria', 'Senegal', 'Sierra Leone', 'Togo'),
   "European Union" =c('Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus',
                       'Czech Republic', 'Denmark', 'Estonia', 'Finland', 'France',
                       'Germany', 'Greece', 'Hungary', 'Ireland', 'Italy',
@@ -395,7 +387,3 @@ ggplot(dt_USA, aes(x = x, y = y, fill = an_d_s_SOC)) +
        y = "Latitude") +
   theme_minimal() +
   theme(legend.key.height = unit(2, "cm"))
-
-
-
-
