@@ -1,6 +1,6 @@
 # filename:     covariate-analysis.R    
 # created:      30 April 2026
-# last updated: 27 May 2026
+# last updated: 28 May 2026
 # author:       Docker Clark
 
 # description:  
@@ -90,9 +90,9 @@ dt_scenario[MINERL_sum_ < 0 , MINERL_sum_ := NA]
 range(dt_scenario$MINERL_sum_, na.rm = T)
 
 # the mineral N appears to be log-normal. transform 
-plot(density(dt_scenario[, MINERL_sum_]))
+plot(density(dt_scenario[, MINERL_sum_], na.rm = T))
 dt_scenario[, log_minerl := log(MINERL_sum_)]
-plot(density(dt_scenario[, log_minerl]))
+plot(density(dt_scenario[, log_minerl], na.rm = T))
 
 #remove rows w/ non-finite vals for annual SOC sequest
 dt_scenario <- dt_scenario[!is.na(an_d_s_SOC), ]
@@ -132,10 +132,50 @@ ggplot(dt_scenario, mapping = aes(x = appN.total, y = an_d_s_SOC)) +
   geom_text(data = appN_soc_r2, aes(x = x, y = y, label = paste0("R2 = ", round(r2*100, 2), "%")),
             color = "gray30", show.legend = F, vjust = 2) +
   facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
+#showing point density
+ggplot(dt_scenario, mapping = aes(x = appN.total, y = an_d_s_SOC)) +
+  geom_hex(bins = 50) +
+  geom_smooth(data = dt_scenario[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_scenario[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_scenario[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
+  scale_color_manual(values = cat_cols) +
+  scale_fill_viridis_c(option = "inferno") +
+  theme_bw() +
+  theme(legend.key = element_rect(fill = "white")) +
+  labs(x = expression("Total Applied Nitrogen" ~ (g ~ m^-2 ~ yr^-1)),
+       y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
+       title = "Total Applied N by Annual Delta SOC",
+       subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),
+       fill = "Observations") +
+  geom_text(data = appN_soc_r2, aes(x = x, y = y, label = paste0("R2 = ", round(r2*100, 2), "%")),
+            color = "gray30", show.legend = F, vjust = 2) +
+  facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
+
+# TODO consider binning the initial N (mineral N by the quantiles of the log-transormed version)
+# these bins could then be displayed as colors on the plots.
+#adding coloring by the quantiles of log-transformed mineral N 
+ggplot(dt_scenario[is.na(MINERL_sum_) == F, ], mapping = aes(y = an_d_s_SOC, x = appN.total)) +
+  geom_point(shape = 16, alpha = 0.3, aes(color = log_minerl), show.legend = T) +
+  geom_smooth(data = dt_scenario[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_scenario[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_scenario[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
+  scale_color_binned(breaks = quantile(dt_scenario$log_minerl, probs = c(0.25,0.5,0.75)),
+                     palette = cat_cols) +
+  theme_bw() +
+  theme(legend.key = element_rect(fill = "white")) +
+  labs(x = expression("Total Applied Nitrogen" ~ (g ~ m^-2 ~ yr^-1)),
+       y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
+       title = "Total Applied N by Annual Delta SOC",
+       subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),
+       color = "Quantile of\nLog-Initial N") +
+  geom_text(data = appN_soc_r2, aes(x = x, y = y, label = paste0("R2 = ", round(r2*100, 2), "%")),
+            color = "gray30", show.legend = F, vjust = 2) +
+  facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
+#getting a bit abstract here. this plot is less useful
 
 #Annual SOC sequest and bulk density
 #precompute R-sq
-bd_r2 <- dt_scenario[ , .(x  = mean(range(SLBLKD)), y  = Inf, #top of plot area
+bd_r2 <- dt_scenario[ , .(x  = mean(range(SLBLKD, na.rm = T)), y  = Inf, #top of plot area
                                 r2 = summary(lm(SLBLKD ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
 ggplot(dt_scenario[is.na(SLBLKD) == F, ], mapping = aes(y = an_d_s_SOC, x = SLBLKD)) +
   geom_point(shape = 16, alpha = 0.3, aes(color = crop), show.legend = F) +
@@ -154,25 +194,17 @@ ggplot(dt_scenario[is.na(SLBLKD) == F, ], mapping = aes(y = an_d_s_SOC, x = SLBL
             color = "gray30", show.legend = F, vjust = 2) +
   facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
 
-
-ggplot(dt_scenario, aes(y = an_d_s_SOC, x = log_minerl)) +
-  geom_point(shape = 16, aes(color = crop)) +
+# comparing initial N with total applied N
+ggplot(dt_scenario, aes(x = log_minerl, y = appN.total)) +
+  geom_point(shape = 16, alpha = 0.3, aes(color = crop), show.legend = F) + 
+  geom_smooth(method = "lm", color = "gray30") +
+  scale_color_manual(values = cat_cols) +
   theme_bw() +
-  facet_grid(cols = vars(crop))
-
-dt_scenario <- dt_scenario[is.na(MINERL_sum_) == F, ]
-ggplot(dt_scenario, aes(x = log_minerl, y = appN.total)) +
-  geom_point() +
-  geom_smooth()
-plot(density(dt_scenario[, MINERL_sum_]))
-plot(density(dt_scenario[, appN.total ]))
-quantile(dt_scenario[, MINERL_sum_])
-quantile(dt_scenario[, appN.total])
-# TODO consider binning the initial N (mineral N by the quantiles of the log-transormed version)
-# these bins could then be displayed as colors on the plots.
-ggplot(dt_scenario, aes(x = log_minerl, y = appN.total)) +
-  geom_point() + 
-  geom_smooth(method = "lm")
+  labs(x = "Log-Transformed Mineral N Stock",
+       y = expression("Total Applied N" ~ (g ~ m^-2 ~ yr^-1)),
+       title = "Applied and Initial N Stocks",
+       subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),) +
+  facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
 
 #annual SOC sequestration and pH
 #precompute R2
@@ -222,7 +254,7 @@ ggplot(dt_scenario, aes(y = an_d_s_SOC, x = SLCLAY)) +
 sand_r2 <- dt_scenario[ , .(x  = mean(range(SLSAND)), y  = Inf, #top of plot area
                             r2 = summary(lm(SLSAND ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
 ggplot(dt_scenario, aes(y = an_d_s_SOC, x = SLSAND)) +
-  geom_point(shape = 16, alpha = 0.3, aes(color = crop), show.legend = F) +
+  geom_jitter(shape = 16, alpha = 0.3, aes(color = crop), width = 0.05, show.legend = F) +
   geom_smooth(data = dt_scenario[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
   geom_smooth(data = dt_scenario[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
   geom_smooth(data = dt_scenario[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
@@ -241,10 +273,10 @@ ggplot(dt_scenario, aes(y = an_d_s_SOC, x = SLSAND)) +
 
 #relative water content
 ggplot(dt_scenario, mapping = aes(x = RWCF_sum_, y = an_d_s_SOC)) +
-  geom_point(aes(color = crop), alpha = 0.3) +
+  geom_point(aes(color = as.factor(irr)), alpha = 0.3) +
   scale_color_manual(values = cat_cols, labels = c("maiz" = "Corn", "soyb" = "Soy", "wht" = "Wheat")) +
-  facet_grid(cols = vars(irr), labeller = as_labeller(irr_labs)) +
-  labs(color = "Crop", x = "Soil Water Content", 
+  facet_grid(cols = vars(crop), labeller = as_labeller(crop_names)) +
+  labs(color = "Irrigation", x = "Soil Water Content", 
        y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
        title = "Relative Soil Water Content by Annual Delta SOC",
        subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years")) +
