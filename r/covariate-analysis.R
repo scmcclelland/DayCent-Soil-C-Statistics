@@ -1,6 +1,6 @@
 # filename:     covariate-analysis.R    
 # created:      30 April 2026
-# last updated: 28 May 2026
+# last updated: 29 May 2026
 # author:       Docker Clark
 
 # description:  
@@ -12,6 +12,9 @@ library(data.table)
 library(ggplot2)
 library(ggridges)
 library(stringr)
+library(sf)
+library(terra)
+library(rstudioapi)
 
 #-------------------------------------------------------------------------------
 # directories and startup
@@ -22,9 +25,10 @@ b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Stati
 args    <- commandArgs(trailingOnly = TRUE) 
 args[1] <- "analysis-input"
 args[2] <- "analysis-output"
-args[3] <- "res"
+args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
+args[6] <- "Global"
 
 #for later labeling
 scenario_labels <- c(
@@ -40,6 +44,159 @@ scenario_labels <- c(
   "ccl-ntill" = "Legume Cover Crop, No-Tillage & Full Residue Retention")
 
 #-------------------------------------------------------------------------------
+# load in spatial data
+#-------------------------------------------------------------------------------
+# define shapefile path
+shp_p <- paste(b_path, args[1], "shp", sep = "/")
+
+# read in shape file #~/analysis-input/shp
+r_shp   <- st_read(paste(shp_p, 'WB_countries_Admin0_10m.shp', sep = '/'))
+# read in crop mask
+r       <- rast(paste(b_path, args[1], 'msw-cropland-rf-ir-area.tif', sep = '/'))
+# keep first layer terra::rasterize needs a single layer raster
+r       <- r[[1]]
+
+# create function
+# inputs are the shape file and the raster (above)
+create_WB_cty <- function(shp_f, rst) {
+  # ORIGINAL WB NAME and OBJECTID
+  shp_dt          <- setDT(as.data.table(st_drop_geometry(shp_f)))
+  # MATCH resolution of simulation data, dimensions the same
+  target.r    <- rst
+  # CONFIRM SHP in same coord ref syst as target
+  country.sf  <- st_transform(shp_f, crs(target.r))
+  country_r   <- terra::rasterize(
+    x       = vect(country.sf),
+    y       = target.r,
+    field   = "OBJECTID",
+    touches = TRUE          # optional: include cells touched by polygons
+  )
+  # CREATE data.frame, merge
+  new_shp_dt  <- as.data.frame(country_r, cells = TRUE, xy = TRUE)
+  new_shp_dt  <- setDT(new_shp_dt) # data.table object
+  # GET WB names to match to ID
+  shp_names   <- data.table(WB_NAME   = shp_dt$WB_NAME,
+                            ID        = shp_dt$OBJECTID)
+  # JOIN with WB names
+  new_shp_dt  <- new_shp_dt[shp_names, on = .(OBJECTID = ID)]  
+  return(new_shp_dt)
+}
+
+# create country data table with function
+WB_dt <- create_WB_cty(r_shp, r)
+
+#add a scenario "dt_scenario"
+{
+  time <- Sys.time() #track how long this takes to load
+  load(paste0(b_path, "/", args[1], "/",      #base file path
+              args[4], "/", args[5], "-",     #time scale & SOC delta
+              args[3],".RData"))              #scenario code and extension
+  duration <- round((Sys.time()-time), 3)
+  message(paste0("Loaded ", scenario_labels[args[3]], " in ", duration, " seconds."))
+  rm(time, duration) #delete after
+}
+# join country data table to simulation data
+dt_scenario <- dt_scenario[WB_dt[,c('cell', 'WB_NAME', "x", "y")], on = .(gridid = cell)]
+# remove NAs
+dt_scenario <- dt_scenario[!is.na(crop)]
+setorder(dt_scenario, gridid)
+gc() #garbage collection
+
+#-------------------------------------------------------------------------------
+# specify regions for filtering
+#-------------------------------------------------------------------------------
+# IPCC Region Names (AR6 & Roe et al. 2021)
+# Africa and Middle East
+AME   = c('Congo, Democratic Republic of', 'Nigeria', 'Tanzania', 'South Africa', 'Congo, Rep. of', 'Zambia',
+          'Angola', 'Cameroon', 'Ethiopia', 'Mozambique', 'Iran, Islamic Republic of', 'Uganda',
+          'Central African Republic', 'Gabon', 'Sudan', "Côte d'Ivoire", 'Kenya', 'Egypt, Arab Republic of',
+          'Ghana', 'Zimbabwe', 'Mali', 'Namibia', 'South Sudan', 'Chad', 'Morocco', 'Botswana', 'Burkina Faso',
+          'Niger', 'Guinea', 'Algeria', 'Liberia', 'Malawi', 'Senegal', 'Somalia', 'Saudi Arabia', 'Benin', 
+          'Sierra Leone', 'Iraq', 'Rwanda', 'Eritrea', 'eSwatini', 'Benin', 'Burundi', 'Djibouti', 'Equatorial Guinea',
+          'Madagascar', 'Mauritania', 'Tunisia', 'Syrian Arab Republic', 'Lebanon', 'Jordan', 'Libya', 'Israel', 
+          'West Bank and Gaza', 'Kuwait', 'Oman', 'Qatar', 'United Arab Emirates', 'Yemen, Republic of', 'Cabo Verde',
+          'Guinea-Bissau', 'Togo', 'Comoros', 'Mauritius', 'Lesotho', "Gambia, The", "Bahrain")
+ADP   = c('China', 'Indonesia', 'India', 'Myanmar', 'Vietnam', 'Malaysia', 'Thailand', 'Pakistan', 'Papua New Guinea',
+          'Philippines', 'Bangladesh', 'Cambodia', "Lao People's Democratic Republic", 'Mongolia', 'Korea, Republic of',
+          'Afghanistan', 'Nepa', 'Sri Lanka', "Korea, Democratic People's Republic of", 'Solomon Islands', 'Bhutan',
+          'Timor-Leste', 'Fiji', 'Nepal', 'Hong Kong (SAR, China)', 'Brunei Darussalam', 'Samoa', 'Vanuatu', 'Tonga')
+DEV   = c('United States of America', 'Canada', 'Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Czech Republic', 'Denmark',
+          'Estonia', 'Finland', 'France', 'Germany', 'Greece', 'Hungary', 'Ireland', 'Italy', 'Latvia', 'Lithuania', 'Luxembourg',
+          'Netherlands', 'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia','Spain', 'Sweden', 'United Kingdom', 'Australia', 'Ukraine',
+          'Japan', 'Turkey', 'New Zealand', 'Norway', 'Iceland', 'Greenland (Den.)', 'Faroe Islands (Den.)', 'Switzerland', 'Saint-Pierre-et-Miquelon (Fr.)',
+          'Cyprus', 'Puerto Rico (US)', 'American Samoa (US)', 'Saint Helena, Ascension and Tristan da Cunha (UK)', 'New Caledonia (Fr.)',
+          'French Southern and Antarctic Lands (Fr.)', 'Falkland Islands (UK)/Islas Malvinas', 'South Georgia and South Sandwich Islands (UK)')
+EEWCA = c('Russian Federation', 'Kazakhstan', 'Belarus', 'Uzbekistan', 'Turkmenistan', 'Kyrgyz Republic', 'Azerbaijan',
+          'Moldova', 'Tajikistan', 'Armenia', 'Serbia', 'Bosnia and Herzegovina', 'Georgia', 'Montenegro', 'Kosovo', 'Albania',
+          'North Macedonia')
+LAC   = c('Brazil', 'Colombia', 'Mexico', 'Argentina', 'Bolivia', 'Peru', 'Venezuela', 'Paraguay', 'Ecuador', 'Chile', 'Guyana', 'Suriname',
+          'Cuba', 'Uruguay', 'Honduras', 'Nicaragua', 'Guatemala', 'Guyana', 'Costa Rica', 'Panama', 'Dominican Republic', 'El Salvador', 'Belize',
+          'Bahamas, The', 'Haiti', 'Turks and Caicos Islands (UK)', 'Jamaica', 'Venezuela, Republica Bolivariana de', 'Trinidad and Tobago')
+
+#creating IPCC names
+dt_scenario[WB_NAME %in% AME, IPCC_NAME   := 'AME']
+dt_scenario[WB_NAME %in% ADP, IPCC_NAME   := 'ADP']
+dt_scenario[WB_NAME %in% DEV, IPCC_NAME   := 'DEV']
+dt_scenario[WB_NAME %in% EEWCA, IPCC_NAME := 'EEWCA']
+dt_scenario[WB_NAME %in% LAC, IPCC_NAME   := 'LAC']
+
+# check if missing but the groups above should capture everything
+if (nrow(dt_scenario[is.na(IPCC_NAME), .(WB_NAME, IPCC_NAME)]) > 0) {
+  #which countries are not captured
+  missing <- dt_scenario[is.na(IPCC_NAME), unique(WB_NAME)]
+  message("All countries not captured. Missing: ", missing)
+} else {
+  message("All countries captured.")
+}
+
+#our specified regions
+regions <- list(
+  "North America" = c("United States of America", "Canada"),
+  "Oceania"       = c('Australia', 'New Zealand'),
+  "Europe"        = c('Albania', 'Andorra', 'Austria', 'Belarus', 'Belgium', 'Bosnia and Herzegovina',
+                      'Bulgaria', 'Croatia', 'Cyprus', 'Czech Republic', 'Denmark', 'Estonia',
+                      'Finland', 'France', 'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland',
+                      'Italy', 'Kosovo', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg',
+                      'Malta', 'Moldova', 'Monaco', 'Montenegro', 'Netherlands', 'North Macedonia',
+                      'Norway', 'Poland', 'Portugal', 'Romania', 'Russian Federation', 'San Marino',
+                      'Serbia', 'Slovak Republic', 'Slovenia', 'Spain', 'Sweden', 'Switzerland',
+                      'Ukraine', 'United Kingdom', 'Vatican City',
+                      'Faroe Islands (Den.)', 'Gibraltar (UK)', 'Guernsey (UK)', 'Isle of Man (UK)',
+                      'Jersey (UK)', 'Svalbard (Nor.)', 'Greenland (Den.)'),
+  "European Union" =c('Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus',
+                      'Czech Republic', 'Denmark', 'Estonia', 'Finland', 'France',
+                      'Germany', 'Greece', 'Hungary', 'Ireland', 'Italy',
+                      'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
+                      'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
+                      'Spain', 'Sweden'))
+
+#-------------------------------------------------------------------------------
+# Filter to desired regions
+#-------------------------------------------------------------------------------
+# reset args[6] if desired
+args[6] <- "United States of America"
+
+if (args[6] == "Global") {
+  countries <- unique(dt_scenario$WB_NAME)
+} else if (args[6] %in% names(regions)) {
+  countries <- regions[[args[6]]]
+} else if (args[6] %in% dt_scenario$WB_NAME) {
+  countries <- args[6]
+} else {
+  message(args[6], " not found in filter function")
+  countries <- NULL
+}
+#filter according to countries
+dt_filtered <- dt_scenario[WB_NAME %in% countries, ]
+
+#annualize SOC as a new column so either can be used
+yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
+dt_filtered[, an_d_s_SOC := d_s_SOC / yrs]
+
+#collapse monte carlo reps into the mean value for each gridcell-crop-irr
+dt_filtered <- dt_filtered[, lapply(.SD, mean), .SDcols = c("d_s_SOC", "an_d_s_SOC"),
+                             by = .(gridid, crop, irr)]
+#-------------------------------------------------------------------------------
 # load and join data tables
 #-------------------------------------------------------------------------------
 #Covariate tables
@@ -52,56 +209,37 @@ main_table <- main_table[, .(gridid, crop, irr, x, y, fertN.amt, orgN.amt, orgCN
 dt_covars <- dt_covars[ , .(gridid, crop, irr, ELEV, MAXPH, MINERL_sum_, NITRAT_sum_,
                             RWCF_sum_, SLBLKD, SLCLAY, SLPH, SLSAND)]
 
-#add a scenario "dt_scenario"
-{
-  time <- Sys.time() #track how long this takes to load
-  load(paste0(b_path, "/", args[1], "/",      #base file path
-              args[4], "/", args[5], "-",     #time scale & SOC delta
-              args[3],".RData"))              #scenario code and extension
-  duration <- round((Sys.time()-time), 3)
-  message(paste0("Loaded ", scenario_labels[args[3]], " in ", duration, " seconds."))
-  rm(time, duration) #delete after
-}
 
-#annualize SOC as a new column so either can be used
-yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
-dt_scenario[, an_d_s_SOC := d_s_SOC / yrs]
-
-#collapse monte carlo reps into the mean value for each gridcell-crop-irr
-dt_scenario <- dt_scenario[, lapply(.SD, mean), .SDcols = c("d_s_SOC", "an_d_s_SOC"),
-                             by = .(gridid, crop, irr)]
 
 #left join to avoid dropping rows (join by gridcell, rep, crop, and irr)
-dt_scenario <- main_table[dt_scenario, on = .(gridid, crop, irr)]
+dt_filtered <- main_table[dt_filtered, on = .(gridid, crop, irr)]
 
 #dt_covars does not split wht into summer and winter
 #standardize summer and winter wheat to just wheat before joining
-dt_scenario[crop %in% c("swht", "wwht"), crop := "wht"]
-dt_scenario <- dt_covars[dt_scenario, on = .(gridid, crop, irr)]
+dt_filtered[crop %in% c("swht", "wwht"), crop := "wht"]
+dt_filtered <- dt_covars[dt_filtered, on = .(gridid, crop, irr)]
 
 #calculate total applied N
-dt_scenario[, appN.total := fertN.amt + orgN.amt]
-
+dt_filtered[, appN.total := fertN.amt + orgN.amt]
 
 #mineral N: Check for absurdly high or below-zero values
-range(dt_scenario$MINERL_sum_, na.rm = T)
-dt_scenario[MINERL_sum_ > 10000, MINERL_sum_ := NA]
-dt_scenario[MINERL_sum_ < 0 , MINERL_sum_ := NA]
-range(dt_scenario$MINERL_sum_, na.rm = T)
+range(dt_filtered$MINERL_sum_, na.rm = T)
+dt_filtered[MINERL_sum_ > 10000, MINERL_sum_ := NA]
+dt_filtered[MINERL_sum_ < 0 , MINERL_sum_ := NA]
+range(dt_filtered$MINERL_sum_, na.rm = T)
 
 # the mineral N appears to be log-normal. transform 
-plot(density(dt_scenario[, MINERL_sum_], na.rm = T))
-dt_scenario[, log_minerl := log(MINERL_sum_)]
-plot(density(dt_scenario[, log_minerl], na.rm = T))
+plot(density(dt_filtered[, MINERL_sum_], na.rm = T))
+dt_filtered[, log_minerl := log(MINERL_sum_)]
+plot(density(dt_filtered[, log_minerl], na.rm = T))
 
 #remove rows w/ non-finite vals for annual SOC sequest
-dt_scenario <- dt_scenario[!is.na(an_d_s_SOC), ]
+dt_filtered <- dt_filtered[!is.na(an_d_s_SOC), ]
 
 #split dt by crop for later
-dt_corn <- dt_scenario[crop == "maiz", ]
-dt_wheat<- dt_scenario[crop == "wht",  ]
-dt_soyb <- dt_scenario[crop == "soyb", ]
-
+dt_corn <- dt_filtered[crop == "maiz", ]
+dt_wheat<- dt_filtered[crop == "wht",  ]
+dt_soyb <- dt_filtered[crop == "soyb", ]
 #-------------------------------------------------------------------------------
 # Themes
 #-------------------------------------------------------------------------------
@@ -114,13 +252,13 @@ cat_cols <- c("#FC8D62", "#8DA0CB", "#66C2A5", "#A6D854", "#FFD92F", "#E78AC3", 
 #-------------------------------------------------------------------------------
 #Annual SOC sequest and total applied N
 #pre compute the R2 to display as an annotation
-appN_soc_r2 <- dt_scenario[ , .(x  = mean(range(appN.total)), y  = Inf, #top of plot area
+appN_soc_r2 <- dt_filtered[ , .(x  = mean(range(appN.total)), y  = Inf, #top of plot area
                                 r2 = summary(lm(appN.total ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
-ggplot(dt_scenario, mapping = aes(x = appN.total, y = an_d_s_SOC)) +
+ggplot(dt_filtered, mapping = aes(x = appN.total, y = an_d_s_SOC)) +
   geom_point(shape = 16, alpha = 0.3, aes(color = as.factor(crop)), show.legend = F) +
-  geom_smooth(data = dt_scenario[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
   scale_color_manual(values = cat_cols) +
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
@@ -133,11 +271,11 @@ ggplot(dt_scenario, mapping = aes(x = appN.total, y = an_d_s_SOC)) +
             color = "gray30", show.legend = F, vjust = 2) +
   facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
 #showing point density
-ggplot(dt_scenario, mapping = aes(x = appN.total, y = an_d_s_SOC)) +
+ggplot(dt_filtered, mapping = aes(x = appN.total, y = an_d_s_SOC)) +
   geom_hex(bins = 50) +
-  geom_smooth(data = dt_scenario[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
   scale_color_manual(values = cat_cols) +
   scale_fill_viridis_c(option = "inferno") +
   theme_bw() +
@@ -154,12 +292,13 @@ ggplot(dt_scenario, mapping = aes(x = appN.total, y = an_d_s_SOC)) +
 # TODO consider binning the initial N (mineral N by the quantiles of the log-transormed version)
 # these bins could then be displayed as colors on the plots.
 #adding coloring by the quantiles of log-transformed mineral N 
-ggplot(dt_scenario[is.na(MINERL_sum_) == F, ], mapping = aes(y = an_d_s_SOC, x = appN.total)) +
+ggplot(dt_filtered[is.na(MINERL_sum_) == F, ], mapping = aes(y = an_d_s_SOC, x = appN.total)) +
   geom_point(shape = 16, alpha = 0.3, aes(color = log_minerl), show.legend = T) +
-  geom_smooth(data = dt_scenario[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
-  scale_color_binned(breaks = quantile(dt_scenario$log_minerl, probs = c(0.25,0.5,0.75)),
+  geom_smooth(data = dt_filtered[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
+  scale_color_binned(breaks = quantile(dt_filtered$log_minerl, probs = c(0.25,0.5,0.75),
+                                       na.rm = T),
                      palette = cat_cols) +
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
@@ -175,13 +314,13 @@ ggplot(dt_scenario[is.na(MINERL_sum_) == F, ], mapping = aes(y = an_d_s_SOC, x =
 
 #Annual SOC sequest and bulk density
 #precompute R-sq
-bd_r2 <- dt_scenario[ , .(x  = mean(range(SLBLKD, na.rm = T)), y  = Inf, #top of plot area
+bd_r2 <- dt_filtered[ , .(x  = mean(range(SLBLKD, na.rm = T)), y  = Inf, #top of plot area
                                 r2 = summary(lm(SLBLKD ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
-ggplot(dt_scenario[is.na(SLBLKD) == F, ], mapping = aes(y = an_d_s_SOC, x = SLBLKD)) +
+ggplot(dt_filtered[is.na(SLBLKD) == F, ], mapping = aes(y = an_d_s_SOC, x = SLBLKD)) +
   geom_point(shape = 16, alpha = 0.3, aes(color = crop), show.legend = F) +
-  geom_smooth(data = dt_scenario[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
   scale_color_manual(values = cat_cols) +
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
@@ -195,7 +334,7 @@ ggplot(dt_scenario[is.na(SLBLKD) == F, ], mapping = aes(y = an_d_s_SOC, x = SLBL
   facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
 
 # comparing initial N with total applied N
-ggplot(dt_scenario, aes(x = log_minerl, y = appN.total)) +
+ggplot(dt_filtered, aes(x = log_minerl, y = appN.total)) +
   geom_point(shape = 16, alpha = 0.3, aes(color = crop), show.legend = F) + 
   geom_smooth(method = "lm", color = "gray30") +
   scale_color_manual(values = cat_cols) +
@@ -208,13 +347,13 @@ ggplot(dt_scenario, aes(x = log_minerl, y = appN.total)) +
 
 #annual SOC sequestration and pH
 #precompute R2
-ph_r2 <- dt_scenario[ , .(x  = mean(range(SLPH)), y  = Inf, #top of plot area
+ph_r2 <- dt_filtered[ , .(x  = mean(range(SLPH)), y  = Inf, #top of plot area
                           r2 = summary(lm(SLPH ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
-ggplot(dt_scenario, aes(y = an_d_s_SOC, x = SLPH)) +
+ggplot(dt_filtered, aes(y = an_d_s_SOC, x = SLPH)) +
   geom_point(shape = 16, alpha = 0.3, aes(color = crop), show.legend = F) +
-  geom_smooth(data = dt_scenario[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
   scale_color_manual(values = cat_cols) +
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
@@ -229,13 +368,13 @@ ggplot(dt_scenario, aes(y = an_d_s_SOC, x = SLPH)) +
 
 #annual SOC sequestration and CLAY content
 #precompute R2
-clay_r2 <- dt_scenario[ , .(x  = mean(range(SLCLAY)), y  = Inf, #top of plot area
+clay_r2 <- dt_filtered[ , .(x  = mean(range(SLCLAY)), y  = Inf, #top of plot area
                             r2 = summary(lm(SLCLAY ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
-ggplot(dt_scenario, aes(y = an_d_s_SOC, x = SLCLAY)) +
+ggplot(dt_filtered, aes(y = an_d_s_SOC, x = SLCLAY)) +
   geom_point(shape = 16, alpha = 0.3, aes(color = crop), show.legend = F) +
-  geom_smooth(data = dt_scenario[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
+  geom_smooth(data = dt_filtered[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
   scale_color_manual(values = cat_cols) +
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
@@ -249,30 +388,8 @@ ggplot(dt_scenario, aes(y = an_d_s_SOC, x = SLCLAY)) +
   facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
 # these and the ph covariate plots have some slight discreteness leading to bands of points. Consider a jitter
 
-# Sand???
-#precompute R2
-sand_r2 <- dt_scenario[ , .(x  = mean(range(SLSAND)), y  = Inf, #top of plot area
-                            r2 = summary(lm(SLSAND ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
-ggplot(dt_scenario, aes(y = an_d_s_SOC, x = SLSAND)) +
-  geom_jitter(shape = 16, alpha = 0.3, aes(color = crop), width = 0.05, show.legend = F) +
-  geom_smooth(data = dt_scenario[crop == "soyb", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "maiz", ], method = "lm", color = "gray30", se = F) +
-  geom_smooth(data = dt_scenario[crop == "wht", ],  method = "lm", color = "gray30", se = F) +
-  scale_color_manual(values = cat_cols) +
-  theme_bw() +
-  theme(legend.key = element_rect(fill = "white")) +
-  labs(x = expression("Soil Sand Fraction"),
-       y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
-       title = "Annual Delta SOC by Soil Sand Fraction",
-       subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),
-       color = "Crop") +
-  geom_text(data = sand_r2, aes(x = x, y = y, label = paste0("R2 = ", round(r2*100, 2), "%")),
-            color = "gray30", show.legend = F, vjust = 2) +
-  facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
-# consider a slight horizontal jitter
-
 #relative water content
-ggplot(dt_scenario, mapping = aes(x = RWCF_sum_, y = an_d_s_SOC)) +
+ggplot(dt_filtered, mapping = aes(x = RWCF_sum_, y = an_d_s_SOC)) +
   geom_point(aes(color = as.factor(irr)), alpha = 0.3) +
   scale_color_manual(values = cat_cols, labels = c("maiz" = "Corn", "soyb" = "Soy", "wht" = "Wheat")) +
   facet_grid(cols = vars(crop), labeller = as_labeller(crop_names)) +
@@ -281,3 +398,123 @@ ggplot(dt_scenario, mapping = aes(x = RWCF_sum_, y = an_d_s_SOC)) +
        title = "Relative Soil Water Content by Annual Delta SOC",
        subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years")) +
   theme_bw()
+
+#-------------------------------------------------------------------------------
+# Sub-global PDFs and CDFs
+#-------------------------------------------------------------------------------
+plot_options <- list(
+  "Corn"        = dt_corn,
+  "Soy"         = dt_soyb,
+  "Wheat"       = dt_wheat,
+  "Clay Content" = NULL,  # placeholder until created
+  "Applied N"   = NULL)
+
+choice <- menu(names(plot_options), 
+               title = paste0("Filtered to: ", args[6], ". Specify next filter."))
+
+if (choice == 0) {
+  message("No selection made.")
+} else if (is.null(plot_options[[choice]])) {
+  message("Required data table not yet created.")
+} else {
+  dt_plot <- plot_options[[choice]]
+  message("Filtered to: ", names(plot_options[choice]))
+}
+
+#a function which allows calculation of probabilities from PDFs and CDFs
+ecdf_fn <- ecdf(dt_plot$an_d_s_SOC)
+
+# PDF: Probability Density Function
+{#specify a probability range to highlight if desired. otherwise skip
+  #between x1 (lower bound) and x2 (upper bound)
+  x1 <- 0.5
+  x2 <- 0.75
+  prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
+  #precompute density so we can shade a region
+  dens <- density(dt_plot$an_d_s_SOC, adjust = 2)
+  dens_dt <- data.table(x = dens$x, y = dens$y)
+}
+
+PDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
+  geom_density(fill = "#4e9d7e", color = "#2d6e56",
+               alpha = 0.6, linewidth = 0.8,
+               adjust = 2) +
+  labs(title = paste("PDF: Soil Carbon Change Distribution", args[6], 
+                     names(plot_options[choice]), sep = " | "),
+       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
+       x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
+       y = "Probability Density") +
+  theme_minimal(base_size = 13) +
+  theme(
+    panel.grid.minor   = element_blank(),
+    plot.title         = element_text(size = 13, face = "bold"),
+    plot.subtitle      = element_text(size = 11),
+    axis.text          = element_text(size = 10),
+    axis.title         = element_text(size = 11),
+    axis.line          = element_line(color = "grey70"),
+    plot.background    = element_rect(fill = "white", color = NA),
+    plot.margin        = margin(15, 15, 10, 10)) +
+  scale_x_continuous(
+    breaks = seq(0, 3, by = 0.5),
+    limits = c(0, 3))
+if (exists("dens")) {
+  PDF.plot <- PDF.plot +
+    geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
+                aes(x = x, ymin = 0, ymax = y),
+                fill = "#e8a020", alpha = 0.6) +
+    annotate("text", x = (x1 + x2) /2, y = max(dens_dt[x >= x1 & x <= x2]$y) / 2,
+             label = paste0("P = ", round(prob_range, 3)),
+             size = 4, fontface = "bold") 
+}
+#call the plot
+print(PDF.plot)
+ggsave(filename = paste0(out.path, "/", "pdf", "_", args[3], "_", args[6], "_", 
+                         args[4],"_", names(plot_options[choice]), ".png"),
+       width = 8, height = 5, units = "in", dpi = 300)
+
+
+# CDF: Cumulative Density Function
+#specify a threshold value to point out in an annotation
+soc.thresh <- (0.5)
+cdf.line <- ecdf_fn(soc.thresh)
+
+CDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
+  stat_ecdf(geom = "step", linewidth = 1.2, color = "#2d6e56") +
+  geom_hline(yintercept = c(0.05, 0.5, 0.95),
+             linetype = "dotted", color = "gray50", alpha = 0.6) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = paste(args[6], "CDF: Soil Carbon Change Distribution", 
+                     names(plot_options[choice]), sep = " | "),
+       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
+       x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
+       y = "Cumulative Probability") +
+  theme_bw() +
+  theme(
+    plot.title      = element_text(size = 13, face = "bold"),
+    plot.subtitle   = element_text(size = 11),
+    axis.text       = element_text(size = 10),
+    axis.title      = element_text(size = 11),
+    plot.background = element_rect(fill = "white", color = NA),
+    plot.margin     = margin(15, 15, 10, 10)) +
+  scale_x_continuous(
+    breaks = seq(0, 3, by = 0.5),
+    limits = c(0, 3))
+if (exists("soc.thresh")) {
+  CDF.plot <- CDF.plot +
+    annotate("segment", x = soc.thresh, xend = soc.thresh,
+             y = -Inf, yend = cdf.line,
+             linetype = "dashed", color = "#e8a020", linewidth = 0.8) +
+    annotate("segment", x = -Inf, xend = soc.thresh,
+             y = cdf.line, yend = cdf.line,
+             linetype = "dashed", color = "#e8a020", linewidth = 0.8) +
+    annotate("point", x = soc.thresh, y = cdf.line, 
+             color = "#2d6e56", size = 2, shape = 21, fill = "#e8a020") +
+    annotate("text", x = (soc.thresh + 0.05), y = cdf.line,
+             label = paste0("P(X ≤ ", soc.thresh, ") = ", 100*(round(cdf.line, 3)), "%"),
+             hjust = -0.1, size = 3.5, fontface = "bold")
+}
+#call the plot
+print(CDF.plot)
+ggsave(filename = paste0(out.path, "/", "cdf", "_", args[3], "_", args[6], "_", 
+                         args[4],"_", names(plot_options[choice]), ".png"),
+              width = 8, height = 5, units = "in", dpi = 300)
