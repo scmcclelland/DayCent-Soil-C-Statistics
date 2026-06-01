@@ -1,6 +1,6 @@
 # filename:     covariate-analysis.R    
 # created:      30 April 2026
-# last updated: 29 May 2026
+# last updated: 01 June 2026
 # author:       Docker Clark
 
 # description:  
@@ -105,51 +105,6 @@ gc() #garbage collection
 #-------------------------------------------------------------------------------
 # specify regions for filtering
 #-------------------------------------------------------------------------------
-# IPCC Region Names (AR6 & Roe et al. 2021)
-# Africa and Middle East
-AME   = c('Congo, Democratic Republic of', 'Nigeria', 'Tanzania', 'South Africa', 'Congo, Rep. of', 'Zambia',
-          'Angola', 'Cameroon', 'Ethiopia', 'Mozambique', 'Iran, Islamic Republic of', 'Uganda',
-          'Central African Republic', 'Gabon', 'Sudan', "Côte d'Ivoire", 'Kenya', 'Egypt, Arab Republic of',
-          'Ghana', 'Zimbabwe', 'Mali', 'Namibia', 'South Sudan', 'Chad', 'Morocco', 'Botswana', 'Burkina Faso',
-          'Niger', 'Guinea', 'Algeria', 'Liberia', 'Malawi', 'Senegal', 'Somalia', 'Saudi Arabia', 'Benin', 
-          'Sierra Leone', 'Iraq', 'Rwanda', 'Eritrea', 'eSwatini', 'Benin', 'Burundi', 'Djibouti', 'Equatorial Guinea',
-          'Madagascar', 'Mauritania', 'Tunisia', 'Syrian Arab Republic', 'Lebanon', 'Jordan', 'Libya', 'Israel', 
-          'West Bank and Gaza', 'Kuwait', 'Oman', 'Qatar', 'United Arab Emirates', 'Yemen, Republic of', 'Cabo Verde',
-          'Guinea-Bissau', 'Togo', 'Comoros', 'Mauritius', 'Lesotho', "Gambia, The", "Bahrain")
-ADP   = c('China', 'Indonesia', 'India', 'Myanmar', 'Vietnam', 'Malaysia', 'Thailand', 'Pakistan', 'Papua New Guinea',
-          'Philippines', 'Bangladesh', 'Cambodia', "Lao People's Democratic Republic", 'Mongolia', 'Korea, Republic of',
-          'Afghanistan', 'Nepa', 'Sri Lanka', "Korea, Democratic People's Republic of", 'Solomon Islands', 'Bhutan',
-          'Timor-Leste', 'Fiji', 'Nepal', 'Hong Kong (SAR, China)', 'Brunei Darussalam', 'Samoa', 'Vanuatu', 'Tonga')
-DEV   = c('United States of America', 'Canada', 'Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Czech Republic', 'Denmark',
-          'Estonia', 'Finland', 'France', 'Germany', 'Greece', 'Hungary', 'Ireland', 'Italy', 'Latvia', 'Lithuania', 'Luxembourg',
-          'Netherlands', 'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia','Spain', 'Sweden', 'United Kingdom', 'Australia', 'Ukraine',
-          'Japan', 'Turkey', 'New Zealand', 'Norway', 'Iceland', 'Greenland (Den.)', 'Faroe Islands (Den.)', 'Switzerland', 'Saint-Pierre-et-Miquelon (Fr.)',
-          'Cyprus', 'Puerto Rico (US)', 'American Samoa (US)', 'Saint Helena, Ascension and Tristan da Cunha (UK)', 'New Caledonia (Fr.)',
-          'French Southern and Antarctic Lands (Fr.)', 'Falkland Islands (UK)/Islas Malvinas', 'South Georgia and South Sandwich Islands (UK)')
-EEWCA = c('Russian Federation', 'Kazakhstan', 'Belarus', 'Uzbekistan', 'Turkmenistan', 'Kyrgyz Republic', 'Azerbaijan',
-          'Moldova', 'Tajikistan', 'Armenia', 'Serbia', 'Bosnia and Herzegovina', 'Georgia', 'Montenegro', 'Kosovo', 'Albania',
-          'North Macedonia')
-LAC   = c('Brazil', 'Colombia', 'Mexico', 'Argentina', 'Bolivia', 'Peru', 'Venezuela', 'Paraguay', 'Ecuador', 'Chile', 'Guyana', 'Suriname',
-          'Cuba', 'Uruguay', 'Honduras', 'Nicaragua', 'Guatemala', 'Guyana', 'Costa Rica', 'Panama', 'Dominican Republic', 'El Salvador', 'Belize',
-          'Bahamas, The', 'Haiti', 'Turks and Caicos Islands (UK)', 'Jamaica', 'Venezuela, Republica Bolivariana de', 'Trinidad and Tobago')
-
-#creating IPCC names
-dt_scenario[WB_NAME %in% AME, IPCC_NAME   := 'AME']
-dt_scenario[WB_NAME %in% ADP, IPCC_NAME   := 'ADP']
-dt_scenario[WB_NAME %in% DEV, IPCC_NAME   := 'DEV']
-dt_scenario[WB_NAME %in% EEWCA, IPCC_NAME := 'EEWCA']
-dt_scenario[WB_NAME %in% LAC, IPCC_NAME   := 'LAC']
-
-# check if missing but the groups above should capture everything
-if (nrow(dt_scenario[is.na(IPCC_NAME), .(WB_NAME, IPCC_NAME)]) > 0) {
-  #which countries are not captured
-  missing <- dt_scenario[is.na(IPCC_NAME), unique(WB_NAME)]
-  message("All countries not captured. Missing: ", missing)
-} else {
-  message("All countries captured.")
-}
-
-#our specified regions
 regions <- list(
   "North America" = c("United States of America", "Canada"),
   "Oceania"       = c('Australia', 'New Zealand'),
@@ -174,7 +129,7 @@ regions <- list(
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "United States of America"
+args[6] <- "Global"
 
 if (args[6] == "Global") {
   countries <- unique(dt_scenario$WB_NAME)
@@ -195,7 +150,7 @@ dt_filtered[, an_d_s_SOC := d_s_SOC / yrs]
 
 #collapse monte carlo reps into the mean value for each gridcell-crop-irr
 dt_filtered <- dt_filtered[, lapply(.SD, mean), .SDcols = c("d_s_SOC", "an_d_s_SOC"),
-                             by = .(gridid, crop, irr)]
+                             by = .(gridid, crop, irr, WB_NAME)]
 #-------------------------------------------------------------------------------
 # load and join data tables
 #-------------------------------------------------------------------------------
@@ -206,7 +161,7 @@ dt_covars <- fread(paste0(b_path, "/", args[1], "/", "input_site_data.csv"))
 #filter for variables of interest
 main_table <- main_table[, .(gridid, crop, irr, x, y, fertN.amt, orgN.amt, orgCN.ratio,
                              res.rtrn.amt, frac_NH4, frac_NO3, frac_Urea)]
-dt_covars <- dt_covars[ , .(gridid, crop, irr, ELEV, MAXPH, MINERL_sum_, NITRAT_sum_,
+dt_covars <- dt_covars[ , .(gridid, crop, irr, ELEV, MINERL_sum_, NITRAT_sum_,
                             RWCF_sum_, SLBLKD, SLCLAY, SLPH, SLSAND)]
 
 
@@ -409,9 +364,9 @@ plot_options <- list(
   "Clay Content" = NULL,  # placeholder until created
   "Applied N"   = NULL)
 
+{
 choice <- menu(names(plot_options), 
                title = paste0("Filtered to: ", args[6], ". Specify next filter."))
-
 if (choice == 0) {
   message("No selection made.")
 } else if (is.null(plot_options[[choice]])) {
@@ -420,7 +375,7 @@ if (choice == 0) {
   dt_plot <- plot_options[[choice]]
   message("Filtered to: ", names(plot_options[choice]))
 }
-
+}
 #a function which allows calculation of probabilities from PDFs and CDFs
 ecdf_fn <- ecdf(dt_plot$an_d_s_SOC)
 
@@ -468,9 +423,6 @@ if (exists("dens")) {
 }
 #call the plot
 print(PDF.plot)
-ggsave(filename = paste0(out.path, "/", "pdf", "_", args[3], "_", args[6], "_", 
-                         args[4],"_", names(plot_options[choice]), ".png"),
-       width = 8, height = 5, units = "in", dpi = 300)
 
 
 # CDF: Cumulative Density Function
@@ -498,7 +450,9 @@ CDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
     plot.margin     = margin(15, 15, 10, 10)) +
   scale_x_continuous(
     breaks = seq(0, 3, by = 0.5),
-    limits = c(0, 3))
+    limits = c(0, 3)) +
+  annotate("text", x = 3, y = 0.25, label = paste("n =", format(nrow(dt_plot), big.mark = ",")),
+           hjust = 1, size = 3.5, fontface = "bold")
 if (exists("soc.thresh")) {
   CDF.plot <- CDF.plot +
     annotate("segment", x = soc.thresh, xend = soc.thresh,
@@ -515,6 +469,3 @@ if (exists("soc.thresh")) {
 }
 #call the plot
 print(CDF.plot)
-ggsave(filename = paste0(out.path, "/", "cdf", "_", args[3], "_", args[6], "_", 
-                         args[4],"_", names(plot_options[choice]), ".png"),
-              width = 8, height = 5, units = "in", dpi = 300)
