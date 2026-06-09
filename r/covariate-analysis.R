@@ -357,6 +357,11 @@ ggplot(dt_filtered, mapping = aes(x = RWCF_sum_, y = an_d_s_SOC)) +
 #-------------------------------------------------------------------------------
 # Sub-global PDFs and CDFs
 #-------------------------------------------------------------------------------
+#ensure only one unique gridid is kept
+dt_corn <- dt_corn[, .(an_d_s_SOC = mean(an_d_s_SOC)), by = gridid]
+dt_soyb <- dt_soyb[, .(an_d_s_SOC = mean(an_d_s_SOC)), by = gridid]
+dt_wheat <- dt_wheat[, .(an_d_s_SOC = mean(an_d_s_SOC)), by = gridid]
+
 plot_options <- list(
   "Corn"        = dt_corn,
   "Soy"         = dt_soyb,
@@ -451,7 +456,7 @@ CDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
   scale_x_continuous(
     breaks = seq(0, 3, by = 0.5),
     limits = c(0, 3)) +
-  annotate("text", x = 3, y = 0.25, label = paste("n =", format(nrow(dt_plot), big.mark = ",")),
+  annotate("text", x = 3, y = 0.95, label = paste("n =", format(nrow(dt_plot), big.mark = ",")),
            hjust = 1, size = 3.5, fontface = "bold")
 if (exists("soc.thresh")) {
   CDF.plot <- CDF.plot +
