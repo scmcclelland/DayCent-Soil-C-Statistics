@@ -63,9 +63,9 @@ delta_soc                 = function(x) {
 SOC_dt = fread(paste(m_data, f, sep ='/'))
 gc()
 
-# restrict to complete runs (20)
-rn     = 20L
-SOC_dt = SOC_dt[run_yrs == rn,] # 2016-2035 (2016 is inclusive)
+# restrict to complete runs (21)
+rn     = 21L
+SOC_dt = SOC_dt[run_yrs == rn,] # 2016-2036 (2016 is inclusive)
 gc()
 
 # restrict to scenario
@@ -165,11 +165,11 @@ gc()
           # Calculate dSOC (g C m-2), cumulative
             { # 10-yrs
             adj_somsc_10dt = copy(adj_somsc_dt)
-            adj_somsc_10dt = adj_somsc_10dt[time <= 2025,]
+            adj_somsc_10dt = adj_somsc_10dt[time <= 2026,]
             adj_somsc_10dt[, delta_adj_somsc_sum := round(cumsum(delta_adj_somsc), digits = 2), 
                                           by = .(gridid, crop, scenario, irr, ssp, gcm, rep)]
             # subset years for output
-            adj_somsc_10dt = adj_somsc_10dt[time %in% c(2025)]
+            adj_somsc_10dt = adj_somsc_10dt[time %in% c(2026)]
             # clean table
             adj_somsc_10dt = adj_somsc_10dt[, c('gridid', 'crop', 'scenario', 'irr', 'ssp', 
                                             'gcm', 'time', 'rep', 'delta_adj_somsc_sum')]
@@ -186,7 +186,7 @@ gc()
             adj_somsc_dt[, delta_adj_somsc_sum := round(cumsum(delta_adj_somsc), digits = 2), 
                          by = .(gridid, crop, scenario, irr, ssp, gcm, rep)]
             # subset years for output
-            adj_somsc_dt = adj_somsc_dt[time %in% c(2035)]
+            adj_somsc_dt = adj_somsc_dt[time %in% c(2036)]
             # clean table
             adj_somsc_dt = adj_somsc_dt[, c('gridid', 'crop', 'scenario', 'irr', 'ssp', 
                                             'gcm', 'time', 'rep', 'delta_adj_somsc_sum')]
