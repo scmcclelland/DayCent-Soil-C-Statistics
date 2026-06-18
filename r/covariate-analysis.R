@@ -1,6 +1,6 @@
 # filename:     covariate-analysis.R    
 # created:      30 April 2026
-# last updated: 01 June 2026
+# last updated: 18 June 2026
 # author:       Docker Clark
 
 # description:  
@@ -201,6 +201,7 @@ dt_soyb <- dt_filtered[crop == "soyb", ]
 crop_names <- c("maiz" = "Corn", "soyb" = "Soy", "wht" = "Wheat")
 irr_labs <- c("0" = "Not Irrigated", "1" = "Irrigated")
 cat_cols <- c("#FC8D62", "#8DA0CB", "#66C2A5", "#A6D854", "#FFD92F", "#E78AC3", "#E5C494","#B3B3B3")
+cdf_cols <- c("#2D6E56", "#4E9D7E", "#E8A020", "#A07178", "#382633")
 
 #-------------------------------------------------------------------------------
 # data exploration 
@@ -387,8 +388,8 @@ ecdf_fn <- ecdf(dt_plot$an_d_s_SOC)
 # PDF: Probability Density Function
 {#specify a probability range to highlight if desired. otherwise skip
   #between x1 (lower bound) and x2 (upper bound)
-  x1 <- 0.5
-  x2 <- 0.75
+  x1 <- quantile(dt_plot$an_d_s_SOC, probs = c(0.95))
+  x2 <- quantile(dt_plot$an_d_s_SOC, probs = c(1))
   prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
   #precompute density so we can shade a region
   dens <- density(dt_plot$an_d_s_SOC, adjust = 2)
@@ -415,28 +416,28 @@ PDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
     plot.background    = element_rect(fill = "white", color = NA),
     plot.margin        = margin(15, 15, 10, 10)) +
   scale_x_continuous(
-    breaks = seq(0, 3, by = 0.5),
-    limits = c(0, 3))
+    breaks = seq(-0.5, 2.5, by = 0.5),
+    limits = c(-0.5, 2.5))
 if (exists("dens")) {
   PDF.plot <- PDF.plot +
     geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
                 aes(x = x, ymin = 0, ymax = y),
                 fill = "#e8a020", alpha = 0.6) +
-    annotate("text", x = (x1 + x2) /2, y = max(dens_dt[x >= x1 & x <= x2]$y) / 2,
-             label = paste0("P = ", round(prob_range, 3)),
+    annotate("text", x = (x1 + x2)/2, y = max(dens_dt[x >= x1 & x <= x2]$y)+0.5,
+             label = paste0("Upper 5th percentile:\n ", round(x1, 2), " < X < ", round(x2, 2)),
              size = 4, fontface = "bold") 
 }
 #call the plot
 print(PDF.plot)
 
-
+cdf_cols <- c("#2D6E56", "#4E9D7E", "#A07178", "#8A89C0", "#E8A020", "#77877B")
 # CDF: Cumulative Density Function
 #specify a threshold value to point out in an annotation
 soc.thresh <- (0.5)
-cdf.line <- ecdf_fn(soc.thresh)
+cdf.lines <- ecdf_fn(soc.thresh)
 
 CDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
-  stat_ecdf(geom = "step", linewidth = 1.2, color = "#2d6e56") +
+  stat_ecdf(geom = "step", linewidth = 1.2, color = cdf_cols[1]) +
   geom_hline(yintercept = c(0.05, 0.5, 0.95),
              linetype = "dotted", color = "gray50", alpha = 0.6) +
   scale_y_continuous(labels = scales::percent_format()) +
@@ -454,20 +455,66 @@ CDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
     plot.background = element_rect(fill = "white", color = NA),
     plot.margin     = margin(15, 15, 10, 10)) +
   scale_x_continuous(
-    breaks = seq(0, 3, by = 0.5),
-    limits = c(0, 3)) +
+    breaks = seq(0, 2.5, by = 0.5),
+    limits = c(0, 2.5)) +
   annotate("text", x = 3, y = 0.95, label = paste("n =", format(nrow(dt_plot), big.mark = ",")),
            hjust = 1, size = 3.5, fontface = "bold")
 if (exists("soc.thresh")) {
   CDF.plot <- CDF.plot +
     annotate("segment", x = soc.thresh, xend = soc.thresh,
-             y = -Inf, yend = cdf.line,
-             linetype = "dashed", color = "#e8a020", linewidth = 0.8) +
-    annotate("segment", x = -Inf, xend = soc.thresh,
-             y = cdf.line, yend = cdf.line,
-             linetype = "dashed", color = "#e8a020", linewidth = 0.8) +
+             y = -Inf, yend = Inf,
+             linetype = "dashed", color = cdf_cols[5], linewidth = 0.8) +
     annotate("point", x = soc.thresh, y = cdf.line, 
-             color = "#2d6e56", size = 2, shape = 21, fill = "#e8a020") +
+             color = cdf_cols[5], size = 2, shape = 21, fill = cdf_cols[1]) +
+    annotate("text", x = (soc.thresh + 0.05), y = cdf.line,
+             label = paste0("P(X ≤ ", soc.thresh, ") = ", 100*(round(cdf.line, 3)), "%"),
+             hjust = -0.1, size = 3.5, fontface = "bold")
+}
+#call the plot
+print(CDF.plot)
+
+
+#-------------------------------------------------------------------------------
+# Scenario analysis on CDF plots
+#-------------------------------------------------------------------------------
+
+soc.thresh <- (0.5)
+cdf.lines <- ecdf_fn(soc.thresh)
+
+CDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
+  #render background cdf lines first so they appear below the main line
+  stat_ecdf(data = dt_plot_ccg, geom = "step", linewidth = 1.2, color = cdf_cols[3], alpha = 1) +
+  stat_ecdf(data = dt_plot_ccg_res, geom = "step", linewidth = 1.2, color = cdf_cols[4], alpha = 1) +
+  #main cdf line is full stacked practices
+  stat_ecdf(geom = "step", linewidth = 1.2, color = cdf_cols[1]) +
+  geom_hline(yintercept = c(0.05, 0.5, 0.95),
+             linetype = "dotted", color = "gray50", alpha = 0.6) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = paste(args[6], "CDF: Soil Carbon Change Distribution", 
+                     names(plot_options[choice]), sep = " | "),
+       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
+       x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
+       y = "Cumulative Probability") +
+  theme_bw() +
+  theme(
+    plot.title      = element_text(size = 13, face = "bold"),
+    plot.subtitle   = element_text(size = 11),
+    axis.text       = element_text(size = 10),
+    axis.title      = element_text(size = 11),
+    plot.background = element_rect(fill = "white", color = NA),
+    plot.margin     = margin(15, 15, 10, 10)) +
+  scale_x_continuous(
+    breaks = seq(0, 2.5, by = 0.5),
+    limits = c(0, 2.5)) +
+  annotate("text", x = 3, y = 0.95, label = paste("n =", format(nrow(dt_plot), big.mark = ",")),
+           hjust = 1, size = 3.5, fontface = "bold")
+if (exists("soc.thresh")) {
+  CDF.plot <- CDF.plot +
+    annotate("segment", x = soc.thresh, xend = soc.thresh,
+             y = -Inf, yend = Inf,
+             linetype = "dashed", color = cdf_cols[5], linewidth = 0.8) +
+    annotate("point", x = soc.thresh, y = cdf.line, 
+             color = cdf_cols[5], size = 2, shape = 21, fill = cdf_cols[1]) +
     annotate("text", x = (soc.thresh + 0.05), y = cdf.line,
              label = paste0("P(X ≤ ", soc.thresh, ") = ", 100*(round(cdf.line, 3)), "%"),
              hjust = -0.1, size = 3.5, fontface = "bold")
