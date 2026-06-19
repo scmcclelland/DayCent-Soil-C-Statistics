@@ -1,6 +1,6 @@
 # filename:     geo-analysis.R    
 # created:      20 April 2026
-# last updated: 30 April 2026
+# last updated: 19 May 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales. 
@@ -24,8 +24,8 @@ b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Stati
 args    <- commandArgs(trailingOnly = TRUE) 
 args[1] <- "analysis-input"
 args[2] <- "analysis-output"
-args[3] <- 'ccl'
-args[4] <- '20-yr'
+args[3] <- "res"
+args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
 args[6] <- "Europe"
 
@@ -52,8 +52,7 @@ scenario_labels <- c(
   "ccg-res"   = "Grass Cover Crop & Full Residue Retention",
   "ccl-res"   = "Legume Cover Crop & Full Residue Retention",
   "ccg-ntill" = "Grass Cover Crop, No-Tillage & Full Residue Retention",
-  "ccl-ntill" = "Legume Cover Crop, No-Tillage & Full Residue Retention"
-)
+  "ccl-ntill" = "Legume Cover Crop, No-Tillage & Full Residue Retention")
 #-------------------------------------------------------------------------------
 # ADD regions
 #-------------------------------------------------------------------------------
@@ -150,13 +149,8 @@ if (nrow(dt_scenario[is.na(IPCC_NAME), .(WB_NAME, IPCC_NAME)]) > 0) {
 # Sub-global filtering
 #-------------------------------------------------------------------------------
 regions <- list(
-  "North America" = c("United States of America", "Mexico", "Canada"),
-  "Oceania"       = c('Australia', 'New Zealand', 'Papua New Guinea', 'Solomon Islands',
-                      'Fiji', 'Vanuatu', 'Samoa', 'Tonga', 'Kiribati', 'Micronesia, Fed. Sts.',
-                      'Palau', 'Marshall Islands', 'Tuvalu', 'Nauru',
-                      'New Caledonia (Fr.)', 'French Polynesia (Fr.)', 'Guam (US)',
-                      'Northern Mariana Islands (US)', 'American Samoa (US)',
-                      'Cook Islands (NZ)', 'Niue (NZ)', 'Wallis and Futuna (Fr.)'),
+  "North America" = c("United States of America", "Canada"),
+  "Oceania"       = c('Australia', 'New Zealand'),
   "Europe"        = c('Albania', 'Andorra', 'Austria', 'Belarus', 'Belgium', 'Bosnia and Herzegovina',
                       'Bulgaria', 'Croatia', 'Cyprus', 'Czech Republic', 'Denmark', 'Estonia',
                       'Finland', 'France', 'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland',
@@ -167,9 +161,6 @@ regions <- list(
                       'Ukraine', 'United Kingdom', 'Vatican City',
                       'Faroe Islands (Den.)', 'Gibraltar (UK)', 'Guernsey (UK)', 'Isle of Man (UK)',
                       'Jersey (UK)', 'Svalbard (Nor.)', 'Greenland (Den.)'),
-  "West Africa"   = c('Benin', 'Burkina Faso', 'Cabo Verde', "Côte d'Ivoire", "Gambia, The",
-                      'Ghana', 'Guinea', 'Guinea-Bissau', 'Liberia', 'Mali', 'Mauritania',
-                      'Niger', 'Nigeria', 'Senegal', 'Sierra Leone', 'Togo'),
   "European Union" =c('Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus',
                       'Czech Republic', 'Denmark', 'Estonia', 'Finland', 'France',
                       'Germany', 'Greece', 'Hungary', 'Ireland', 'Italy',
@@ -178,10 +169,59 @@ regions <- list(
                       'Spain', 'Sweden')
 )
 
-# reset args[6] if desired
-args[6] <- "United States of America"
+#-------------------------------------------------------------------------------
+# Populate data table for regional histogram
+#-------------------------------------------------------------------------------
+#Specify desired regions for comparison in the histogram.
+hist_regions <- c("United States of America", "European Union", "Brazil", 
+                  "Argentina", "Australia", "China", "India")
 
-#filtering for desired regions
+#filter data and collect means of each region
+for (r in 1:length(hist_regions)) {
+  message("Filtering to: ", hist_regions[r])
+  args[6] <- hist_regions[r]
+  
+  #filtering for desired regions
+  if (args[6] == "Global") {
+    countries <- unique(dt_scenario$WB_NAME)
+  } else if (args[6] %in% names(regions)) {
+    countries <- regions[[args[6]]]
+  } else if (args[6] %in% dt_scenario$WB_NAME) {
+    countries <- args[6]
+  } else {
+    stop(args[6], " not found in filter function")
+    countries <- NULL
+  }
+  
+  dt_filtered <- dt_scenario[WB_NAME %in% countries, ]
+  
+  #calculate summary stats
+  dt_stats <- dt_filtered[, .(
+    Min = min(an_d_s_SOC),
+    P25 = quantile(an_d_s_SOC, probs = 0.25),
+    Median = quantile(an_d_s_SOC, probs = 0.50),
+    Mean = mean(an_d_s_SOC),
+    P75 = quantile(an_d_s_SOC, probs = 0.75),
+    Max = max(an_d_s_SOC)), 
+    by = .(rep)] 
+  
+  #add mean vector to a dt
+  if (!exists("dt_geo_means")) {
+    dt_geo_means <- dt_stats[, setNames(list(Mean), args[6])]
+    setDT(dt_geo_means)
+  } else {
+    dt_geo_means[, (args[6]) := dt_stats$Mean]
+  }
+  message(hist_regions[r], " added to dt_geo_means")
+}
+
+#-------------------------------------------------------------------------------
+# Filter to desired regions
+#-------------------------------------------------------------------------------
+# reset args[6] if desired
+args[6] <- "India"
+
+
 if (args[6] == "Global") {
   countries <- unique(dt_scenario$WB_NAME)
 } else if (args[6] %in% names(regions)) {
@@ -361,7 +401,8 @@ CDF.plot
 # Histograms
 #-------------------------------------------------------------------------------
 fillcols <- cat_cols[1:ncol(dt_geo_means)]
-
+dt_means_long$scenario <- factor(dt_means_long$scenario, 
+                                 levels = sort(unique(as.character(dt_means_long$scenario))))
 #shared-axis hist of different regions' MC means
 ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
   geom_histogram(alpha = 0.7, bins = 150, position = "identity") +
@@ -369,9 +410,10 @@ ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
   labs(x = expression("Mean SOC Sequestration (Mg ha"^-1~"yr"^-1*")"),
        y = "Frequency",
        fill = "Region",
-       title = "Distribution of Monte Carlo Means") +
+       title = "Distribution of Monte Carlo Means",
+       subtitle = paste0(yrs, " Years | ", "Scenario: ", scenario_labels[args[3]])) +
   theme_classic() +
-  theme(legend.position = c(0.65, 0.75),
+  theme(legend.position = c(0.85, 0.75),
         legend.background = element_rect(fill = "white", color = "grey90"))
 
 #-------------------------------------------------------------------------------
@@ -396,6 +438,23 @@ ggplot(dt_USA, aes(x = x, y = y, fill = an_d_s_SOC)) +
   theme_minimal() +
   theme(legend.key.height = unit(2, "cm"))
 
-
-
-
+#-------------------------------------------------------------------------------
+# SOC map (according to dt_filtered)
+#-------------------------------------------------------------------------------
+shp_filtered <- r_shp[r_shp$WB_NAME %in% countries, ]
+dt_filtered <- dt_filtered[, lapply(.SD, mean), .SDcols = c("d_s_SOC", "an_d_s_SOC"),
+                           by = .(gridid, crop, irr, x, y)]
+ggplot(dt_filtered, aes(x = x, y = y, fill = an_d_s_SOC)) +
+  geom_raster() +
+  scale_fill_distiller(palette = "PRGn", direction = 1,
+                       name = "SOC Change\n(Mg C/ha/y)",
+                       breaks = pretty(dt_filtered$an_d_s_SOC, n = 8),
+                       labels = scales::label_number(accuracy = 0.01)) +
+  geom_sf(data = shp_filtered, fill = NA, color = "black", linewidth = 0.5, inherit.aes = F) +
+  labs(title = paste("Delta Cumulative SOC | Regional"),
+       subtitle = paste0("Scenario: ", scenario_labels[args[3]], " | ", args[4]), 
+       x = "Longitude",
+       y = "Latitude") +
+  theme_minimal() +
+  theme(legend.key.height = unit(2, "cm"))
+plot(density(dt_filtered$an_d_s_SOC))
