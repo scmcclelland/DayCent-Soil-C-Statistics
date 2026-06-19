@@ -478,6 +478,115 @@ print(CDF.plot)
 # Scenario analysis on CDF plots
 #-------------------------------------------------------------------------------
 
+#TODO find
+#load in data for all desired scenarios 
+for (s in c("ccg", "res", "ccg-res")) {
+  #reset args
+  args[3] <- s
+  #add a scenario "dt_scenario"
+  time <- Sys.time() #track how long this takes to load
+  load(paste0(b_path, "/", args[1], "/",      #base file path
+              args[4], "/", args[5], "-",     #time scale & SOC delta
+              args[3],".RData"))              #scenario code and extension
+  duration <- round((Sys.time()-time), 3)
+  message(paste0("Loaded ", scenario_labels[args[3]], " in ", duration, " seconds."))
+  rm(time, duration) #delete after
+  
+  # join country data table to simulation data
+  dt_scenario <- dt_scenario[WB_dt[,c('cell', 'WB_NAME', "x", "y")], on = .(gridid = cell)]
+  # remove NAs
+  dt_scenario <- dt_scenario[!is.na(crop)]
+  setorder(dt_scenario, gridid)
+  gc() #garbage collection
+  
+  #join covariate tables
+  #left join to avoid dropping rows (join by gridcell, rep, crop, and irr)
+  dt_scenario <- main_table[dt_scenario, on = .(gridid, crop, irr)]
+  
+  #dt_covars does not split wht into summer and winter
+  #standardize summer and winter wheat to just wheat before joining
+  dt_scenario[crop %in% c("swht", "wwht"), crop := "wht"]
+  dt_scenario <- dt_covars[dt_scenario, on = .(gridid, crop, irr)]
+  
+  for (r in c("Global")) {
+    args[6] <- r
+    message("Filtering to: ", r)
+    if (args[6] == "Global") {
+      countries <- unique(dt_scenario$WB_NAME)
+    } else if (args[6] %in% names(regions)) {
+      countries <- regions[[args[6]]]
+    } else if (args[6] %in% dt_scenario$WB_NAME) {
+      countries <- args[6]
+    } else {
+      message(args[6], " not found in filter function")
+      countries <- NULL
+    }
+    #filter according to countries
+    dt_filtered <- dt_scenario[WB_NAME %in% countries, ]
+    
+    #annualize SOC as a new column so either can be used
+    yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
+    dt_filtered[, an_d_s_SOC := d_s_SOC / yrs]
+    
+    #collapse monte carlo reps into the mean value for each gridcell-crop-irr
+    dt_filtered <- dt_filtered[, lapply(.SD, mean), .SDcols = c("d_s_SOC", "an_d_s_SOC"),
+                               by = .(gridid, crop, irr, WB_NAME)]
+    
+    #remove rows w/ non-finite vals for annual SOC sequest
+    dt_filtered <- dt_filtered[!is.na(an_d_s_SOC), ]
+    
+    #split dt by crop
+    dt_corn <- dt_filtered[crop == "maiz", ]
+    dt_wheat<- dt_filtered[crop == "wht",  ]
+    dt_soyb <- dt_filtered[crop == "soyb", ]
+    
+    #ensure only one unique gridid is kept
+    dt_corn <- dt_corn[, .(an_d_s_SOC = mean(an_d_s_SOC)), by = gridid]
+    dt_soyb <- dt_soyb[, .(an_d_s_SOC = mean(an_d_s_SOC)), by = gridid]
+    dt_wheat <- dt_wheat[, .(an_d_s_SOC = mean(an_d_s_SOC)), by = gridid]
+    
+    # build standardized names for each crop table
+    dt_corn_name  <- paste0("dt_plot_", gsub(" ", "_", r), "_corn")
+    dt_soyb_name  <- paste0("dt_plot_", gsub(" ", "_", r), "_soyb")
+    dt_wheat_name <- paste0("dt_plot_", gsub(" ", "_", r), "_wheat")
+    
+    # rename an_d_s_SOC column to the current scenario code (use setnames for data.table)
+    setnames(dt_corn,  "an_d_s_SOC", args[3])
+    setnames(dt_soyb,  "an_d_s_SOC", args[3])
+    setnames(dt_wheat, "an_d_s_SOC", args[3])
+    
+    if (exists(dt_corn_name)) {
+      message("Region table already created. Adding SOC column for this scenario.")
+      # subsequent iterations: join new scenario column onto existing table
+      assign(dt_corn_name,
+             get(dt_corn_name, envir = .GlobalEnv)[dt_corn, on = "gridid"],
+             envir = .GlobalEnv)
+      
+      assign(dt_soyb_name,
+             get(dt_soyb_name, envir = .GlobalEnv)[dt_soyb, on = "gridid"],
+             envir = .GlobalEnv)
+      
+      assign(dt_wheat_name,
+             get(dt_wheat_name, envir = .GlobalEnv)[dt_wheat, on = "gridid"],
+             envir = .GlobalEnv)
+      
+    } else {
+      message("Creating base tables for this region")
+      # first iteration: create the tables fresh
+      assign(dt_corn_name,  dt_corn,  envir = .GlobalEnv)
+      assign(dt_soyb_name,  dt_soyb,  envir = .GlobalEnv)
+      assign(dt_wheat_name, dt_wheat, envir = .GlobalEnv)
+    }
+  }
+}
+
+
+
+
+
+
+
+
 soc.thresh <- (0.5)
 cdf.lines <- ecdf_fn(soc.thresh)
 
