@@ -1,6 +1,6 @@
 # filename:     covariate-analysis.R    
 # created:      30 April 2026
-# last updated: 18 June 2026
+# last updated: 19 June 2026
 # author:       Docker Clark
 
 # description:  
@@ -25,7 +25,7 @@ b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Stati
 args    <- commandArgs(trailingOnly = TRUE) 
 args[1] <- "analysis-input"
 args[2] <- "analysis-output"
-args[3] <- "ccg"
+args[3] <- "ccg-ntill"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
 args[6] <- "Global"
@@ -129,7 +129,7 @@ regions <- list(
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "Global"
+args[6] <- "United States of America"
 
 if (args[6] == "Global") {
   countries <- unique(dt_scenario$WB_NAME)
@@ -201,7 +201,7 @@ dt_soyb <- dt_filtered[crop == "soyb", ]
 crop_names <- c("maiz" = "Corn", "soyb" = "Soy", "wht" = "Wheat")
 irr_labs <- c("0" = "Not Irrigated", "1" = "Irrigated")
 cat_cols <- c("#FC8D62", "#8DA0CB", "#66C2A5", "#A6D854", "#FFD92F", "#E78AC3", "#E5C494","#B3B3B3")
-cdf_cols <- c("#2D6E56", "#4E9D7E", "#E8A020", "#A07178", "#382633")
+cdf_cols <- c("#2D6E56", "#4E9D7E", "#A07178", "#8A89C0", "#77877B", "#E8A020")
 
 #-------------------------------------------------------------------------------
 # data exploration 
@@ -478,9 +478,8 @@ print(CDF.plot)
 # Scenario analysis on CDF plots
 #-------------------------------------------------------------------------------
 
-#TODO find
 #load in data for all desired scenarios 
-for (s in c("ccg", "res", "ccg-res")) {
+for (s in c("ccg", "res", "ntill", "ccg-res", "ccg-ntill", "ntill-res")) {
   #reset args
   args[3] <- s
   #add a scenario "dt_scenario"
@@ -499,16 +498,10 @@ for (s in c("ccg", "res", "ccg-res")) {
   setorder(dt_scenario, gridid)
   gc() #garbage collection
   
-  #join covariate tables
-  #left join to avoid dropping rows (join by gridcell, rep, crop, and irr)
-  dt_scenario <- main_table[dt_scenario, on = .(gridid, crop, irr)]
-  
-  #dt_covars does not split wht into summer and winter
-  #standardize summer and winter wheat to just wheat before joining
+  #standardize summer and winter wheat to just wheat 
   dt_scenario[crop %in% c("swht", "wwht"), crop := "wht"]
-  dt_scenario <- dt_covars[dt_scenario, on = .(gridid, crop, irr)]
   
-  for (r in c("Global")) {
+  for (r in c("European Union", "Oceania")) {
     args[6] <- r
     message("Filtering to: ", r)
     if (args[6] == "Global") {
@@ -528,22 +521,16 @@ for (s in c("ccg", "res", "ccg-res")) {
     yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
     dt_filtered[, an_d_s_SOC := d_s_SOC / yrs]
     
-    #collapse monte carlo reps into the mean value for each gridcell-crop-irr
-    dt_filtered <- dt_filtered[, lapply(.SD, mean), .SDcols = c("d_s_SOC", "an_d_s_SOC"),
-                               by = .(gridid, crop, irr, WB_NAME)]
-    
     #remove rows w/ non-finite vals for annual SOC sequest
     dt_filtered <- dt_filtered[!is.na(an_d_s_SOC), ]
+    
+    #filter to only necessary cols
+    dt_filtered <- dt_filtered[ , .(gridid, crop, irr, rep, an_d_s_SOC)]
     
     #split dt by crop
     dt_corn <- dt_filtered[crop == "maiz", ]
     dt_wheat<- dt_filtered[crop == "wht",  ]
     dt_soyb <- dt_filtered[crop == "soyb", ]
-    
-    #ensure only one unique gridid is kept
-    dt_corn <- dt_corn[, .(an_d_s_SOC = mean(an_d_s_SOC)), by = gridid]
-    dt_soyb <- dt_soyb[, .(an_d_s_SOC = mean(an_d_s_SOC)), by = gridid]
-    dt_wheat <- dt_wheat[, .(an_d_s_SOC = mean(an_d_s_SOC)), by = gridid]
     
     # build standardized names for each crop table
     dt_corn_name  <- paste0("dt_plot_", gsub(" ", "_", r), "_corn")
@@ -551,23 +538,23 @@ for (s in c("ccg", "res", "ccg-res")) {
     dt_wheat_name <- paste0("dt_plot_", gsub(" ", "_", r), "_wheat")
     
     # rename an_d_s_SOC column to the current scenario code (use setnames for data.table)
-    setnames(dt_corn,  "an_d_s_SOC", args[3])
-    setnames(dt_soyb,  "an_d_s_SOC", args[3])
-    setnames(dt_wheat, "an_d_s_SOC", args[3])
+    setnames(dt_corn,  "an_d_s_SOC", gsub("-", "_", args[3]))
+    setnames(dt_soyb,  "an_d_s_SOC", gsub("-", "_", args[3]))
+    setnames(dt_wheat, "an_d_s_SOC", gsub("-", "_", args[3]))
     
     if (exists(dt_corn_name)) {
       message("Region table already created. Adding SOC column for this scenario.")
       # subsequent iterations: join new scenario column onto existing table
       assign(dt_corn_name,
-             get(dt_corn_name, envir = .GlobalEnv)[dt_corn, on = "gridid"],
+             get(dt_corn_name, envir = .GlobalEnv)[dt_corn, on = .(gridid, crop, irr, rep)],
              envir = .GlobalEnv)
       
       assign(dt_soyb_name,
-             get(dt_soyb_name, envir = .GlobalEnv)[dt_soyb, on = "gridid"],
+             get(dt_soyb_name, envir = .GlobalEnv)[dt_soyb, on = .(gridid, crop, irr, rep)],
              envir = .GlobalEnv)
       
       assign(dt_wheat_name,
-             get(dt_wheat_name, envir = .GlobalEnv)[dt_wheat, on = "gridid"],
+             get(dt_wheat_name, envir = .GlobalEnv)[dt_wheat, on = .(gridid, crop, irr, rep)],
              envir = .GlobalEnv)
       
     } else {
@@ -578,30 +565,41 @@ for (s in c("ccg", "res", "ccg-res")) {
       assign(dt_wheat_name, dt_wheat, envir = .GlobalEnv)
     }
   }
+  Sys.sleep(3) #this helps the global environment catch up with the loop
 }
 
+#ecdf_fn <- ecdf(dt_plot$an_d_s_SOC)
+#soc.thresh <- (0.5)
+#cdf.lines <- ecdf_fn(soc.thresh)
+cdf_cols <- c("#2D6E56", "#4E9D7E", "#A07178", "#8A89C0", "#77877B", "#E8A020")
+
+
+#reset region
+args[6] <- "European Union"
+plot_prefix <- paste0("dt_plot_", gsub(" ", "_", args[6]))
+dt_plot <- get(paste0(plot_prefix, "_corn"))
 
 
 
 
 
-
-
-soc.thresh <- (0.5)
-cdf.lines <- ecdf_fn(soc.thresh)
-
-CDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
+CDF.plot <- ggplot(dt_plot) +
   #render background cdf lines first so they appear below the main line
-  stat_ecdf(data = dt_plot_ccg, geom = "step", linewidth = 1.2, color = cdf_cols[3], alpha = 1) +
-  stat_ecdf(data = dt_plot_ccg_res, geom = "step", linewidth = 1.2, color = cdf_cols[4], alpha = 1) +
+  stat_ecdf(aes(x = ccg), geom = "line", linewidth = 1.2, 
+            color = cdf_cols[3], alpha = 1) +
+  stat_ecdf(aes(x = ccg_res), geom = "line", linewidth = 1.2, 
+            color = cdf_cols[3], alpha = 0.5, linetype = "dashed") +
+  stat_ecdf(aes(x = ntill), geom = "line", linewidth = 1.2, 
+            color = cdf_cols[2], alpha = 1) +
+  stat_ecdf(aes(x = ntill_res), geom = "step", linewidth = 1.2, 
+            color = cdf_cols[2], alpha = 0.5, linetype = "dashed") +
   #main cdf line is full stacked practices
-  stat_ecdf(geom = "step", linewidth = 1.2, color = cdf_cols[1]) +
+  stat_ecdf(aes(x = ccg_ntill), geom = "line", linewidth = 1.2, color = cdf_cols[1]) +
   geom_hline(yintercept = c(0.05, 0.5, 0.95),
              linetype = "dotted", color = "gray50", alpha = 0.6) +
   scale_y_continuous(labels = scales::percent_format()) +
-  labs(title = paste(args[6], "CDF: Soil Carbon Change Distribution", 
-                     names(plot_options[choice]), sep = " | "),
-       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
+  labs(title = paste(args[6], "CDF: Soil Carbon Change Distribution", sep = " | "),
+       subtitle = paste0("Timescale: ", yrs, " Years | ", "Crop: Corn UPDATE"),
        x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
        y = "Cumulative Probability") +
   theme_bw() +
@@ -613,9 +611,10 @@ CDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
     plot.background = element_rect(fill = "white", color = NA),
     plot.margin     = margin(15, 15, 10, 10)) +
   scale_x_continuous(
-    breaks = seq(0, 2.5, by = 0.5),
-    limits = c(0, 2.5)) +
-  annotate("text", x = 3, y = 0.95, label = paste("n =", format(nrow(dt_plot), big.mark = ",")),
+    breaks = seq(-0.5, 2.5, by = 0.5),
+    limits = c(-0.25, 2.5)) +
+  annotate("text", x = 2.5, y = 0.95, label = 
+             paste("n =", format(length(unique(dt_plot$gridid)), big.mark = ",")),
            hjust = 1, size = 3.5, fontface = "bold")
 if (exists("soc.thresh")) {
   CDF.plot <- CDF.plot +
@@ -630,3 +629,4 @@ if (exists("soc.thresh")) {
 }
 #call the plot
 print(CDF.plot)
+
