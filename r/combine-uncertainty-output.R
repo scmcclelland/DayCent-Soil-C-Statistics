@@ -1,9 +1,9 @@
 # file name:    combine-uncertainty-output.R
 # created:      20 January 2026
-# last updated: 27 March 2026
+# last updated: 29 June 2026
 # author:       S.C. McClelland
 
-# description: This file combines uncertainty output by scenario.
+# description: This file combines uncertainty output by scenario. Run manually.
 #-------------------------------------------------------------------------------
 # LIBRARIES
 #-------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ if (isFALSE(length(args) == 2))
   stop(
     'Needs 2 command-line argument (scenario selection).'
   )
-# args[1] scenario selection
+# args[1] uncertainty-[scenario selection]
 # args[2] timeframe (10-yr or 20-yr)
 #-------------------------------------------------------------------------------
 # DIRECTORIES & FILES

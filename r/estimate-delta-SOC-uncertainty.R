@@ -1,6 +1,6 @@
 # file name:    estimate-delta-SOC-uncertainty.R
 # created:      27 March 2026
-# last updated: 27 March 2026
+# last updated: 29 June 2026
 # author:       S.C. McClelland
 
 # description: This file estimate delta SOC (with uncertainty) between scenario and conv.
@@ -18,7 +18,7 @@ if (isFALSE(length(args) == 2))
   stop(
     'Needs 2 command-line argument (scenario selection).'
   )
-# args[1] scenario selection
+# args[1] scenario selection: uncertainty-[scenario]-somsc
 # args[2] timeframe (10-yr or 20-yr)
 #-------------------------------------------------------------------------------
 # FUNCTIONS 
