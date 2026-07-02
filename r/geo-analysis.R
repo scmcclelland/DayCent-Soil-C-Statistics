@@ -1,6 +1,6 @@
 # filename:     geo-analysis.R    
 # created:      20 April 2026
-# last updated: 19 May 2026
+# last updated: 02 July 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales. 
@@ -24,7 +24,7 @@ b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Stati
 args    <- commandArgs(trailingOnly = TRUE) 
 args[1] <- "analysis-input"
 args[2] <- "analysis-output"
-args[3] <- "res"
+args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
 args[6] <- "Europe"
@@ -219,7 +219,7 @@ for (r in 1:length(hist_regions)) {
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "India"
+args[6] <- "Oceania"
 
 
 if (args[6] == "Global") {
@@ -310,48 +310,64 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
 #-------------------------------------------------------------------------------
 # PDF: Probability Density Function
 #-------------------------------------------------------------------------------
-{#specify a probability range to highlight if desired. otherwise skip
+#split dataset by crop
+dt_corn <- dt_filtered[crop == "maiz",]
+dt_soyb <- dt_filtered[crop == "soyb",]
+dt_wheat <- dt_filtered[crop %in% c("swht", "wwht"), ]
+
+#crop names for plot labels
+crop_names <- c("corn" = "Corn",
+                "soyb" = "Soy",
+                "wheat" = "Wheat")
+
+# This loop creates 3 (crop-filtered) PDFs for the chosen region/timescale/scenario. 
+for (crop in c("corn", "soyb", "wheat")) {
+  dt_plot <- get(paste0("dt_", crop))
+  
+  #specify a probability range to highlight if desired. otherwise skip
   #between x1 (lower bound) and x2 (upper bound)
-  x1 <- 0.5
-  x2 <- 0.75
+  x1 <- quantile(dt_plot$an_d_s_SOC, probs = c(0.95))
+  x2 <- quantile(dt_plot$an_d_s_SOC, probs = c(1))
   prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
   #precompute density so we can shade a region
-  dens <- density(dt_filtered$an_d_s_SOC, adjust = 2)
+  dens <- density(dt_plot$an_d_s_SOC, adjust = 2)
   dens_dt <- data.table(x = dens$x, y = dens$y)
+  
+  
+  PDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
+    geom_density(fill = "#4e9d7e", color = "#2d6e56",
+                 alpha = 0.6, linewidth = 0.8,
+                 adjust = 2) +
+    labs(title = paste("PDF: Soil Carbon Change Distribution", args[6], 
+                       crop_names[crop], sep = " | "),
+         subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
+         x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
+         y = "Probability Density") +
+    theme_minimal(base_size = 13) +
+    theme(
+      panel.grid.minor   = element_blank(),
+      plot.title         = element_text(size = 13, face = "bold"),
+      plot.subtitle      = element_text(size = 11),
+      axis.text          = element_text(size = 10),
+      axis.title         = element_text(size = 11),
+      axis.line          = element_line(color = "grey70"),
+      plot.background    = element_rect(fill = "white", color = NA),
+      plot.margin        = margin(15, 15, 10, 10)) +
+    scale_x_continuous(
+      breaks = seq(-0.5, 2.5, by = 0.5),
+      limits = c(-0.5, 2.5))
+  if (exists("dens")) {
+    PDF.plot <- PDF.plot +
+      geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
+                  aes(x = x, ymin = 0, ymax = y),
+                  fill = "#e8a020", alpha = 0.6) +
+      annotate("text", x = 1.75, y = 0.5,
+               label = paste0("Upper 5th percentile:\n ", round(x1, 2), " < X < ", round(x2, 2)),
+               size = 4, fontface = "bold") 
   }
-
-PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
-  geom_density(fill = "#4e9d7e", color = "#2d6e56",
-               alpha = 0.6, linewidth = 0.8,
-               adjust = 2) +
-  labs(title = paste("PDF: Soil Carbon Change Distribution", args[6], sep = " | "),
-       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
-       x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
-       y = "Probability Density") +
-  theme_minimal(base_size = 13) +
-  theme(
-    panel.grid.minor   = element_blank(),
-    plot.title         = element_text(size = 13, face = "bold"),
-    plot.subtitle      = element_text(size = 11),
-    axis.text          = element_text(size = 10),
-    axis.title         = element_text(size = 11),
-    axis.line          = element_line(color = "grey70"),
-    plot.background    = element_rect(fill = "white", color = NA),
-    plot.margin        = margin(15, 15, 10, 10)) +
-  scale_x_continuous(
-    breaks = seq(0, 3, by = 0.5),
-    limits = c(0, 3))
-if (exists("dens")) {
-  PDF.plot <- PDF.plot +
-    geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
-                aes(x = x, ymin = 0, ymax = y),
-                fill = "#e8a020", alpha = 0.6) +
-    annotate("text", x = (x1 + x2) /2, y = max(dens_dt[x >= x1 & x <= x2]$y) / 2,
-             label = paste0("P = ", round(prob_range, 3)),
-             size = 4, fontface = "bold") 
+  #call the plot
+  print(PDF.plot)
 }
-#call the plot
-PDF.plot
 
 #-------------------------------------------------------------------------------
 # CDF: Cumulative Density Function
