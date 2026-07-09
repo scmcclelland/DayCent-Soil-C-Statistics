@@ -188,7 +188,7 @@ plot(density(dt_filtered[, MINERL_sum_], na.rm = T))
 dt_filtered[, log_minerl := log(MINERL_sum_)]
 plot(density(dt_filtered[, log_minerl], na.rm = T))
 
-#remove rows w/ non-finite vals for annual SOC sequest
+#remove rows w/ non-finite vals for annual SOC Change
 dt_filtered <- dt_filtered[!is.na(an_d_s_SOC), ]
 
 #split dt by crop for later
@@ -206,7 +206,7 @@ cdf_cols <- c("#2D6E56", "#4E9D7E", "#A07178", "#8A89C0", "#77877B", "#E8A020")
 #-------------------------------------------------------------------------------
 # data exploration 
 #-------------------------------------------------------------------------------
-#Annual SOC sequest and total applied N
+#Annual SOC change and total applied N
 #pre compute the R2 to display as an annotation
 appN_soc_r2 <- dt_filtered[ , .(x  = mean(range(appN.total)), y  = Inf, #top of plot area
                                 r2 = summary(lm(appN.total ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
@@ -219,7 +219,7 @@ ggplot(dt_filtered, mapping = aes(x = appN.total, y = an_d_s_SOC)) +
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
   labs(x = expression("Total Applied Nitrogen" ~ (g ~ m^-2 ~ yr^-1)),
-       y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
+       y = expression("SOC Change" ~ (Mg ~ ha^-1 ~ yr^-1)),
        title = "Total Applied N by Annual Delta SOC",
        subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),
        color = "Crop") +
@@ -237,7 +237,7 @@ ggplot(dt_filtered, mapping = aes(x = appN.total, y = an_d_s_SOC)) +
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
   labs(x = expression("Total Applied Nitrogen" ~ (g ~ m^-2 ~ yr^-1)),
-       y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
+       y = expression("SOC Change" ~ (Mg ~ ha^-1 ~ yr^-1)),
        title = "Total Applied N by Annual Delta SOC",
        subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),
        fill = "Observations") +
@@ -257,7 +257,7 @@ ggplot(dt_filtered[is.na(MINERL_sum_) == F, ], mapping = aes(y = an_d_s_SOC, x =
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
   labs(x = expression("Total Applied Nitrogen" ~ (g ~ m^-2 ~ yr^-1)),
-       y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
+       y = expression("SOC Change" ~ (Mg ~ ha^-1 ~ yr^-1)),
        title = "Total Applied N by Annual Delta SOC",
        subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),
        color = "Quantile of\nLog-Initial N") +
@@ -266,7 +266,7 @@ ggplot(dt_filtered[is.na(MINERL_sum_) == F, ], mapping = aes(y = an_d_s_SOC, x =
   facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
 #getting a bit abstract here. this plot is less useful
 
-#Annual SOC sequest and bulk density
+#Annual SOC change and bulk density
 #precompute R-sq
 bd_r2 <- dt_filtered[ , .(x  = mean(range(SLBLKD, na.rm = T)), y  = Inf, #top of plot area
                           r2 = summary(lm(SLBLKD ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
@@ -279,7 +279,7 @@ ggplot(dt_filtered[is.na(SLBLKD) == F, ], mapping = aes(y = an_d_s_SOC, x = SLBL
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
   labs(x = expression("Soil Bulk Density" ~ (g ~ cm^-3)),
-       y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
+       y = expression("SOC Change" ~ (Mg ~ ha^-1 ~ yr^-1)),
        title = "Annual Delta SOC by Bulk Density",
        subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),
        color = "Crop") +
@@ -299,7 +299,7 @@ ggplot(dt_filtered, aes(x = log_minerl, y = appN.total)) +
        subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),) +
   facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
 
-#annual SOC sequestration and pH
+#annual SOC change and pH
 #precompute R2
 ph_r2 <- dt_filtered[ , .(x  = mean(range(SLPH)), y  = Inf, #top of plot area
                           r2 = summary(lm(SLPH ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
@@ -312,7 +312,7 @@ ggplot(dt_filtered, aes(y = an_d_s_SOC, x = SLPH)) +
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
   labs(x = expression("Soil pH"),
-       y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
+       y = expression("SOC Change" ~ (Mg ~ ha^-1 ~ yr^-1)),
        title = "Annual Delta SOC by Soil pH",
        subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),
        color = "Crop") +
@@ -320,7 +320,7 @@ ggplot(dt_filtered, aes(y = an_d_s_SOC, x = SLPH)) +
             color = "gray30", show.legend = F, vjust = 2) +
   facet_grid(cols = vars(crop), labeller = as_labeller(crop_names))
 
-#annual SOC sequestration and CLAY content
+#annual SOC Change and CLAY content
 #precompute R2
 clay_r2 <- dt_filtered[ , .(x  = mean(range(SLCLAY)), y  = Inf, #top of plot area
                             r2 = summary(lm(SLCLAY ~ an_d_s_SOC, data = .SD))$r.squared), by = crop]
@@ -333,7 +333,7 @@ ggplot(dt_filtered, aes(y = an_d_s_SOC, x = SLCLAY)) +
   theme_bw() +
   theme(legend.key = element_rect(fill = "white")) +
   labs(x = expression("Soil Clay Fraction"),
-       y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
+       y = expression("SOC Change" ~ (Mg ~ ha^-1 ~ yr^-1)),
        title = "Annual Delta SOC by Soil Clay Fraction",
        subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years"),
        color = "Crop") +
@@ -348,7 +348,7 @@ ggplot(dt_filtered, mapping = aes(x = RWCF_sum_, y = an_d_s_SOC)) +
   scale_color_manual(values = cat_cols, labels = c("maiz" = "Corn", "soyb" = "Soy", "wht" = "Wheat")) +
   facet_grid(cols = vars(crop), labeller = as_labeller(crop_names)) +
   labs(color = "Irrigation", x = "Soil Water Content", 
-       y = expression("SOC Sequestration" ~ (Mg ~ ha^-1 ~ yr^-1)),
+       y = expression("SOC Change" ~ (Mg ~ ha^-1 ~ yr^-1)),
        title = "Relative Soil Water Content by Annual Delta SOC",
        subtitle = paste0(scenario_labels[args[3]], " | ", yrs, " years")) +
   theme_bw()

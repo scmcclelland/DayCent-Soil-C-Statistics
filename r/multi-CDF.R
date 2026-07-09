@@ -170,7 +170,7 @@ if (file.exists(paste0(
     yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
     dt_filtered[, an_d_s_SOC := d_s_SOC / yrs]
     
-    #remove rows w/ non-finite vals for annual SOC sequest
+    #remove rows w/ non-finite vals for annual SOC change
     dt_filtered <- dt_filtered[!is.na(an_d_s_SOC), ]
     
     #filter to only necessary cols

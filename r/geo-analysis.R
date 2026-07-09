@@ -1,6 +1,6 @@
 # filename:     geo-analysis.R    
 # created:      20 April 2026
-# last updated: 02 July 2026
+# last updated: 09 July 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales. 
@@ -289,7 +289,7 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
   scale_x_continuous(
     breaks = seq(-1, 4, by = 0.5),
     limits = c(-1, 4)) +
-  labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Sequestration Over" ~ .(yrs) ~ "Years"),
+  labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Change Over" ~ .(yrs) ~ "Years"),
        y = NULL,
        title = "Distribution of Summary Statistics",
        subtitle = paste0(args[6], " | ", "Scenario - ", scenario_labels[args[3]]),
@@ -423,7 +423,7 @@ dt_means_long$scenario <- factor(dt_means_long$scenario,
 ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
   geom_histogram(alpha = 0.7, bins = 150, position = "identity") +
   scale_fill_manual(values = fillcols, labels = scenario_labels) +
-  labs(x = expression("Mean SOC Sequestration (Mg ha"^-1~"yr"^-1*")"),
+  labs(x = expression("Mean SOC Change (Mg ha"^-1~"yr"^-1*")"),
        y = "Frequency",
        fill = "Region",
        title = "Distribution of Monte Carlo Means",
