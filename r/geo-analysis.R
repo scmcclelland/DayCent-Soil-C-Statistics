@@ -99,7 +99,7 @@ setorder(dt_scenario, gridid)
 gc() #garbage collection
 
 #----------------------------------------------------------------
-# ADD IPCC REGION NAMES
+# Add IPCC Region Names
 #----------------------------------------------------------------
 # IPCC Region Names (AR6 & Roe et al. 2021)
 # Africa and Middle East
@@ -140,13 +140,13 @@ dt_scenario[WB_NAME %in% LAC, IPCC_NAME   := 'LAC']
 if (nrow(dt_scenario[is.na(IPCC_NAME), .(WB_NAME, IPCC_NAME)]) > 0) {
   #which countries are not captured
   missing <- dt_scenario[is.na(IPCC_NAME), unique(WB_NAME)]
-  message("All countries not captured. Missing: ", missing)
+  message("Some countries not captured. Missing: ", paste(missing, sep = ", "))
 } else {
   message("All countries captured.")
 }
 
 #-------------------------------------------------------------------------------
-# Sub-global filtering
+# Additional Desired Regions
 #-------------------------------------------------------------------------------
 regions <- list(
   "North America" = c("United States of America", "Canada"),
@@ -197,12 +197,8 @@ for (r in 1:length(hist_regions)) {
   
   #calculate summary stats
   dt_stats <- dt_filtered[, .(
-    Min = min(an_d_s_SOC),
-    P25 = quantile(an_d_s_SOC, probs = 0.25),
     Median = quantile(an_d_s_SOC, probs = 0.50),
-    Mean = mean(an_d_s_SOC),
-    P75 = quantile(an_d_s_SOC, probs = 0.75),
-    Max = max(an_d_s_SOC)), 
+    Mean = mean(an_d_s_SOC)), 
     by = .(rep)] 
   
   #add mean vector to a dt
@@ -267,7 +263,7 @@ dt_long <- melt(dt_stats,
 
 dt_means_long <- melt(dt_geo_means, 
                       measure.vars = colnames(dt_geo_means),
-                      variable.name = "scenario",
+                      variable.name = "region",
                       value.name = "mean_SOC")
 #-------------------------------------------------------------------------------
 # Shared Themes
@@ -414,15 +410,16 @@ if (exists("soc.thresh")) {
 CDF.plot
 
 #-------------------------------------------------------------------------------
-# Histograms
+# Multi-Region Histogram
 #-------------------------------------------------------------------------------
 fillcols <- cat_cols[1:ncol(dt_geo_means)]
-dt_means_long$scenario <- factor(dt_means_long$scenario, 
-                                 levels = sort(unique(as.character(dt_means_long$scenario))))
+region_levels <- levels(dt_means_long$region)
+dt_means_long$region <- factor(dt_means_long$region, 
+                                 levels = sort(unique(as.character(dt_means_long$region))))
 #shared-axis hist of different regions' MC means
-ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
+ggplot(dt_means_long, aes(x = mean_SOC, fill = region)) +
   geom_histogram(alpha = 0.7, bins = 150, position = "identity") +
-  scale_fill_manual(values = fillcols, labels = scenario_labels) +
+  scale_fill_manual(values = fillcols, labels = region_levels) +
   labs(x = expression("Mean SOC Change (Mg ha"^-1~"yr"^-1*")"),
        y = "Frequency",
        fill = "Region",
