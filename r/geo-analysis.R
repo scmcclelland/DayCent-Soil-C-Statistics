@@ -1,6 +1,6 @@
 # filename:     geo-analysis.R    
 # created:      20 April 2026
-# last updated: 09 July 2026
+# last updated: 13 July 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales. 
@@ -176,7 +176,7 @@ regions <- list(
 hist_regions <- c("United States of America", "European Union", "Brazil", 
                   "Argentina", "Australia", "China", "India")
 
-#filter data and collect means of each region
+#filter data and collect means of each region (~2sec per region)
 for (r in 1:length(hist_regions)) {
   message("Filtering to: ", hist_regions[r])
   args[6] <- hist_regions[r]

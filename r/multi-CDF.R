@@ -1,6 +1,6 @@
 # filename:     multi-CDF.R    
 # created:      26 June 2026
-# last updated: 02 July 2026
+# last updated: 13 July 2026
 # author:       Docker Clark
 
 # description: This script performs two main functions:
@@ -176,11 +176,6 @@ if (file.exists(paste0(
     #filter to only necessary cols
     dt_filtered <- dt_filtered[ , .(gridid, crop, irr, rep, an_d_s_SOC)]
     
-    #TODO this is where I believe the ggplot issue arises.
-    dt_filtered[crop == "wht", an_d_s_SOC := mean(an_d_s_SOC, na.rm = TRUE),
-                by = .(gridid, irr, rep)]
-    dt_filtered <- unique(dt_filtered, by = c("gridid", "crop", "irr", "rep"))
-    
     #split dt by crop
     dt_corn <- dt_filtered[crop == "maiz", ]
     dt_wheat<- dt_filtered[crop == "wht",  ]
@@ -200,7 +195,6 @@ if (file.exists(paste0(
       message("Adding SOC column for this scenario via safe merge.")
       
       #Assign the tables to the GE
-      #TODO This, too, should be flagged for wheat table bug fixing
       assign(dt_corn_name,
              merge(get(dt_corn_name, envir = .GlobalEnv), dt_corn, 
                    by = c("gridid", "crop", "irr", "rep"), all = TRUE),
