@@ -1,6 +1,6 @@
 # file name:    combine-uncertainty-output.R
 # created:      20 January 2026
-# last updated: 29 June 2026
+# last updated: 02 July 2026
 # author:       S.C. McClelland
 
 # description: This file combines uncertainty output by scenario. Run manually.
@@ -44,3 +44,5 @@ gc()
 #-------------------------------------------------------------------------------
 # save as Rdata
 save(dt_somsc, file = paste0(u_data, '/merged/',args[1],'-somsc.RData'))
+rm(dt_somsc)
+gc()
