@@ -63,7 +63,7 @@ git remote -v
 # (1) start task
 module load git
 git checkout main
-git pull origin main #same as git fetch origin + git merge origin/main
+git pull origin main #same as git fetch origin + git merge origin/main useful for pre-branch updating
 git checkout -b feature/<initials>-short-desc #-b flag creates a new branch. If branch already exists, just use git checkout feature
 # Examples: 
 # feature/SCM-res-histogram
@@ -74,10 +74,10 @@ git checkout -b feature/<initials>-short-desc #-b flag creates a new branch. If 
 git status
 git add <file1> <file2>
 git commit -m "Short, specific message"
-#
-# TODO after committing and before a push consider pulling main. Commited files
-# are staged and are thus unaffected by the pull. This updates the rest of the
-# project without touching the newly committed files.
+# after files are staged, update the rest of the project
+git fetch origin
+git merge origin/main # this will bring any changes from main into your branch
+:wq #tells Vim to write the files and close Vim
 #
 # (3) push branch and open pull request (PR)
 #
