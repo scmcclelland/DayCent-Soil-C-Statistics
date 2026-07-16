@@ -64,7 +64,7 @@ git remote -v
 module load git
 git checkout main
 git pull origin main #same as git fetch origin + git merge origin/main
-git checkout -b feature/<initials>-short-desc
+git checkout -b feature/<initials>-short-desc #-b flag creates a new branch. If branch already exists, just use git checkout feature
 # Examples: 
 # feature/SCM-res-histogram
 # feature/SCM-ccg-res-percentiles
