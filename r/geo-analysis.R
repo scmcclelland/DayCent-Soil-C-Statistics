@@ -1,9 +1,9 @@
-# filename:     geo-analysis.R    
+# filename:     geo-analysis-crop.R    
 # created:      20 April 2026
-# last updated: 13 July 2026
+# last updated: 17 July 2026
 # author:       Docker Clark
 
-# description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales. 
+# description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales.
 #-------------------------------------------------------------------------------
 # libraries 
 #-------------------------------------------------------------------------------
@@ -149,90 +149,48 @@ if (nrow(dt_scenario[is.na(IPCC_NAME), .(WB_NAME, IPCC_NAME)]) > 0) {
 # Additional Desired Regions
 #-------------------------------------------------------------------------------
 regions <- list(
-  "North America" = c("United States of America", "Canada"),
-  "Oceania"       = c('Australia', 'New Zealand'),
-  "Europe"        = c('Albania', 'Andorra', 'Austria', 'Belarus', 'Belgium', 'Bosnia and Herzegovina',
-                      'Bulgaria', 'Croatia', 'Cyprus', 'Czech Republic', 'Denmark', 'Estonia',
-                      'Finland', 'France', 'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland',
-                      'Italy', 'Kosovo', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg',
-                      'Malta', 'Moldova', 'Monaco', 'Montenegro', 'Netherlands', 'North Macedonia',
-                      'Norway', 'Poland', 'Portugal', 'Romania', 'Russian Federation', 'San Marino',
-                      'Serbia', 'Slovak Republic', 'Slovenia', 'Spain', 'Sweden', 'Switzerland',
-                      'Ukraine', 'United Kingdom', 'Vatican City',
-                      'Faroe Islands (Den.)', 'Gibraltar (UK)', 'Guernsey (UK)', 'Isle of Man (UK)',
-                      'Jersey (UK)', 'Svalbard (Nor.)', 'Greenland (Den.)'),
-  "European Union" =c('Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus',
-                      'Czech Republic', 'Denmark', 'Estonia', 'Finland', 'France',
-                      'Germany', 'Greece', 'Hungary', 'Ireland', 'Italy',
-                      'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
-                      'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
-                      'Spain', 'Sweden')
-)
+  "Global"         = unique(WB_dt$WB_NAME),
+  "Oceania"        = c('Australia', 'New Zealand'),
+  "European Union" = c('Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus',
+                       'Czech Republic', 'Denmark', 'Estonia', 'Finland', 'France',
+                       'Germany', 'Greece', 'Hungary', 'Ireland', 'Italy',
+                       'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
+                       'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
+                       'Spain', 'Sweden'),
+  "USA"            = c("United States of America"))
+
+#-------------------------------------------------------------------------------
+# Shared Themes
+#-------------------------------------------------------------------------------
+#color schemes (continuous)
+linecols <- viridis::viridis(6)
+
+#color schemes (categorical)
+cat_cols <- c("#66C2A5","#FC8D62","#8DA0CB","#E78AC3","#A6D854","#FFD92F","#E5C494","#B3B3B3")
 
 #-------------------------------------------------------------------------------
 # Populate data table for regional histogram
 #-------------------------------------------------------------------------------
-#Specify desired regions for comparison in the histogram.
-hist_regions <- c("United States of America", "European Union", "Brazil", 
-                  "Argentina", "Australia", "China", "India")
+# create and append regional lookup table
+region_dt <- rbindlist(
+  lapply(names(regions), function(r) data.table(region = r, WB_NAME = regions[[r]])))
 
-#filter data and collect means of each region (~2sec per region)
-for (r in 1:length(hist_regions)) {
-  message("Filtering to: ", hist_regions[r])
-  args[6] <- hist_regions[r]
-  
-  #filtering for desired regions
-  if (args[6] == "Global") {
-    countries <- unique(dt_scenario$WB_NAME)
-  } else if (args[6] %in% names(regions)) {
-    countries <- regions[[args[6]]]
-  } else if (args[6] %in% dt_scenario$WB_NAME) {
-    countries <- args[6]
-  } else {
-    stop(args[6], " not found in filter function")
-    countries <- NULL
-  }
-  
-  dt_filtered <- dt_scenario[WB_NAME %in% countries, ]
-  
-  #calculate summary stats
-  dt_stats <- dt_filtered[, .(
-    Median = quantile(an_d_s_SOC, probs = 0.50),
-    Mean = mean(an_d_s_SOC)), 
-    by = .(rep)] 
-  
-  #add mean vector to a dt
-  if (!exists("dt_geo_means")) {
-    dt_geo_means <- dt_stats[, setNames(list(Mean), args[6])]
-    setDT(dt_geo_means)
-  } else {
-    dt_geo_means[, (args[6]) := dt_stats$Mean]
-  }
-  message(hist_regions[r], " added to dt_geo_means")
-}
+#allow.cartesian allows for rows to be added when a WB_NAME belongs two region groups
+# ex. France now has duplicate rows labeled "Global" and "European Union"
+dt_scenario <- merge(dt_scenario, region_dt, by = "WB_NAME", allow.cartesian = TRUE)
+
+dt_means <- dt_scenario[, .(
+  Mean   = mean(an_d_s_SOC)), 
+  by = .(region, rep)]
 
 #-------------------------------------------------------------------------------
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "Oceania"
+args[6] <- "Global"
 
-
-if (args[6] == "Global") {
-  countries <- unique(dt_scenario$WB_NAME)
-} else if (args[6] %in% names(regions)) {
-  countries <- regions[[args[6]]]
-} else if (args[6] %in% dt_scenario$WB_NAME) {
-  countries <- args[6]
-} else {
-  message(args[6], " not found in filter function")
-  countries <- NULL
-}
-#filter according to countries
-dt_filtered <- dt_scenario[WB_NAME %in% countries, ]
-
-#a function which allows calculation of probabilities from PDFs and CDFs
-ecdf_fn <- ecdf(dt_filtered$an_d_s_SOC)
+#filter to correct region
+dt_filtered <- dt_scenario[region == args[6], ]
 
 #-------------------------------------------------------------------------------
 # Statistics
@@ -247,32 +205,11 @@ dt_stats <- dt_filtered[, .(
   Max = max(an_d_s_SOC)), 
   by = .(rep)] 
 
-# Collect means across geographies for comparison
-if (!exists("dt_geo_means")) {
-  dt_geo_means <- dt_stats[, setNames(list(Mean), args[6])]
-  setDT(dt_geo_means)
-} else {
-  dt_geo_means[, (args[6]) := dt_stats$Mean]
-}
-
 #melt data to long for read-in to ggplot
 dt_long <- melt(dt_stats,
                 measure.vars = setdiff(colnames(dt_stats), "rep"),
                 variable.name = "statistic",
                 value.name = "SOC")
-
-dt_means_long <- melt(dt_geo_means, 
-                      measure.vars = colnames(dt_geo_means),
-                      variable.name = "region",
-                      value.name = "mean_SOC")
-#-------------------------------------------------------------------------------
-# Shared Themes
-#-------------------------------------------------------------------------------
-#color schemes (continuous)
-linecols <- viridis::viridis(6)
-
-#color schemes (categorical)
-cat_cols <- c("#66C2A5","#FC8D62","#8DA0CB","#E78AC3","#A6D854","#FFD92F","#E5C494","#B3B3B3")
 
 #-------------------------------------------------------------------------------
 # Sub-Global Ridgeline plot
@@ -304,70 +241,95 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
   )
 
 #-------------------------------------------------------------------------------
+# Multi-Region Histogram
+#-------------------------------------------------------------------------------
+region_levels <- sort(unique(dt_means$region))
+fillcols <- setNames(cat_cols[1:length(region_levels)], region_levels)
+
+ggplot(dt_means) +
+  geom_histogram(aes(x = Mean, fill = region), alpha = 0.5, bins = 100) +
+  scale_fill_manual(values = fillcols) +
+  labs(x = expression("Mean SOC Change (Mg ha"^-1~"yr"^-1*")"),
+       y = "Frequency",
+       fill = "Region",
+       title = "Distribution of Monte Carlo Means",
+       subtitle = paste0(yrs, " Years | ", "Scenario: ", scenario_labels[args[3]])) +
+  theme_classic() +
+  theme(legend.position = c(0.85, 0.75),
+        legend.background = element_rect(fill = "white", color = "grey90"))
+
+#smoothed regional histogram
+ggplot(dt_means) +
+  geom_density(aes(x = Mean, fill = region, color = region), 
+               alpha = 0.5, linewidth = 0.75) +
+  scale_fill_manual(values = fillcols) +
+  scale_color_manual(values = fillcols) +
+  labs(x = expression("Mean SOC Change (Mg ha"^-1~"yr"^-1*")"),
+       y = "Frequency",
+       fill = "Region",
+       color = "Region",
+       title = "Distribution of Monte Carlo Means",
+       subtitle = paste0(yrs, " Years | ", "Scenario: ", scenario_labels[args[3]])) +
+  theme_classic() +
+  theme(legend.position = c(0.85, 0.75),
+        legend.background = element_rect(fill = "white", color = "grey90"))
+
+#ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
+#              "/regional_hist_", args[3], "_", args[4], ".png"),
+#       width = 8.5, height = 5, units = "in", dpi = 300)
+
+#-------------------------------------------------------------------------------
 # PDF: Probability Density Function
 #-------------------------------------------------------------------------------
-#split dataset by crop
-dt_corn <- dt_filtered[crop == "maiz",]
-dt_soyb <- dt_filtered[crop == "soyb",]
-dt_wheat <- dt_filtered[crop %in% c("swht", "wwht"), ]
+#a function which allows calculation of probabilities from PDFs and CDFs
+ecdf_fn <- ecdf(dt_filtered$an_d_s_SOC)
+#specify a probability range to highlight if desired. otherwise skip
+#between x1 (lower bound) and x2 (upper bound)
+x1 <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.95))
+x2 <- quantile(dt_filtered$an_d_s_SOC, probs = c(1))
+prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
+#precompute density so we can shade a region
+dens <- density(dt_filtered$an_d_s_SOC, adjust = 2)
+dens_dt <- data.table(x = dens$x, y = dens$y)
 
-#crop names for plot labels
-crop_names <- c("corn" = "Corn",
-                "soyb" = "Soy",
-                "wheat" = "Wheat")
 
-# This loop creates 3 (crop-filtered) PDFs for the chosen region/timescale/scenario. 
-for (crop in c("corn", "soyb", "wheat")) {
-  dt_plot <- get(paste0("dt_", crop))
-  
-  #specify a probability range to highlight if desired. otherwise skip
-  #between x1 (lower bound) and x2 (upper bound)
-  x1 <- quantile(dt_plot$an_d_s_SOC, probs = c(0.95))
-  x2 <- quantile(dt_plot$an_d_s_SOC, probs = c(1))
-  prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
-  #precompute density so we can shade a region
-  dens <- density(dt_plot$an_d_s_SOC, adjust = 2)
-  dens_dt <- data.table(x = dens$x, y = dens$y)
-  
-  
-  PDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
-    geom_density(fill = "#4e9d7e", color = "#2d6e56",
-                 alpha = 0.6, linewidth = 0.8,
-                 adjust = 2) +
-    labs(title = paste("PDF: Soil Carbon Change Distribution", args[6], 
-                       crop_names[crop], sep = " | "),
-         subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
-         x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
-         y = "Probability Density") +
-    theme_minimal(base_size = 13) +
-    theme(
-      panel.grid.minor   = element_blank(),
-      plot.title         = element_text(size = 13, face = "bold"),
-      plot.subtitle      = element_text(size = 11),
-      axis.text          = element_text(size = 10),
-      axis.title         = element_text(size = 11),
-      axis.line          = element_line(color = "grey70"),
-      plot.background    = element_rect(fill = "white", color = NA),
-      plot.margin        = margin(15, 15, 10, 10)) +
-    scale_x_continuous(
-      breaks = seq(-0.5, 2.5, by = 0.5),
-      limits = c(-0.5, 2.5))
-  if (exists("dens")) {
-    PDF.plot <- PDF.plot +
-      geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
-                  aes(x = x, ymin = 0, ymax = y),
-                  fill = "#e8a020", alpha = 0.6) +
-      annotate("text", x = 1.75, y = 0.5,
-               label = paste0("Upper 5th percentile:\n ", round(x1, 2), " < X < ", round(x2, 2)),
-               size = 4, fontface = "bold") 
-  }
-  #call the plot
-  print(PDF.plot)
+PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
+  geom_density(fill = "#4e9d7e", color = "#2d6e56", 
+               alpha = 0.6, linewidth = 0.8, adjust = 2) +
+  labs(title = paste("PDF: Soil Carbon Change Distribution", args[6], sep = " | "),
+       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
+       x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
+       y = "Probability Density") +
+  theme_minimal(base_size = 13) +
+  theme(
+    panel.grid.minor   = element_blank(),
+    plot.title         = element_text(size = 13, face = "bold"),
+    plot.subtitle      = element_text(size = 11),
+    axis.text          = element_text(size = 10),
+    axis.title         = element_text(size = 11),
+    axis.line          = element_line(color = "grey70"),
+    plot.background    = element_rect(fill = "white", color = NA),
+    plot.margin        = margin(15, 15, 10, 10)) +
+  scale_x_continuous(breaks = seq(-0.5, 2.5, by = 0.5)) +
+  coord_cartesian(xlim = c(-0.5, 2.5))
+if (exists("dens")) {
+  PDF.plot <- PDF.plot +
+    geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
+                aes(x = x, ymin = 0, ymax = y),
+                fill = "#e8a020", alpha = 0.6) +
+    annotate("text", x = 1.75, y = 0.5,
+             label = paste0("Upper 5th percentile:\n ", round(x1, 2), " < X < ", round(x2, 2)),
+             size = 4, fontface = "bold") 
 }
+#call the plot
+print(PDF.plot)
+
 
 #-------------------------------------------------------------------------------
-# CDF: Cumulative Density Function
+# Singular CDF: Cumulative Density Function
 #-------------------------------------------------------------------------------
+#a function which allows calculation of probabilities from PDFs and CDFs
+ecdf_fn <- ecdf(dt_filtered$an_d_s_SOC)
 #specify a threshold value to point out in an annotation
 soc.thresh <- (0.5)
 cdf.line <- ecdf_fn(soc.thresh)
@@ -389,9 +351,8 @@ CDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
     axis.title      = element_text(size = 11),
     plot.background = element_rect(fill = "white", color = NA),
     plot.margin     = margin(15, 15, 10, 10)) +
-  scale_x_continuous(
-    breaks = seq(0, 3, by = 0.5),
-    limits = c(0, 3))
+  scale_x_continuous(breaks = seq(0, 3, by = 0.5)) +
+  coord_cartesian(xlim = c(0, 2.5))
 if (exists("soc.thresh")) {
   CDF.plot <- CDF.plot +
     annotate("segment", x = soc.thresh, xend = soc.thresh,
@@ -407,67 +368,4 @@ if (exists("soc.thresh")) {
              hjust = -0.1, size = 3.5, fontface = "bold")
 }
 #call the plot
-CDF.plot
-
-#-------------------------------------------------------------------------------
-# Multi-Region Histogram
-#-------------------------------------------------------------------------------
-fillcols <- cat_cols[1:ncol(dt_geo_means)]
-region_levels <- levels(dt_means_long$region)
-dt_means_long$region <- factor(dt_means_long$region, 
-                                 levels = sort(unique(as.character(dt_means_long$region))))
-#shared-axis hist of different regions' MC means
-ggplot(dt_means_long, aes(x = mean_SOC, fill = region)) +
-  geom_histogram(alpha = 0.7, bins = 150, position = "identity") +
-  scale_fill_manual(values = fillcols, labels = region_levels) +
-  labs(x = expression("Mean SOC Change (Mg ha"^-1~"yr"^-1*")"),
-       y = "Frequency",
-       fill = "Region",
-       title = "Distribution of Monte Carlo Means",
-       subtitle = paste0(yrs, " Years | ", "Scenario: ", scenario_labels[args[3]])) +
-  theme_classic() +
-  theme(legend.position = c(0.85, 0.75),
-        legend.background = element_rect(fill = "white", color = "grey90"))
-
-#-------------------------------------------------------------------------------
-# United States (contiguous) SOC map
-#-------------------------------------------------------------------------------
-dt_USA <- dt_scenario[WB_NAME  == "United States of America", ]
-shp_USA <- r_shp[r_shp$WB_NAME == "United States of America", ]
-
-ggplot(dt_USA, aes(x = x, y = y, fill = an_d_s_SOC)) +
-  geom_raster() +
-  scale_fill_distiller(palette = "PRGn", direction = 1,
-                       name = "SOC Change\n(Mg C/ha/y)",
-                       breaks = seq(min(dt_USA$an_d_s_SOC),
-                                    max(dt_USA$an_d_s_SOC),
-                                    length.out = 8)) +
-  geom_sf(data = shp_USA, fill = NA, color = "black", linewidth = 0.5, inherit.aes = F) +
-  coord_sf(xlim = c(-125, -66), ylim = c(24, 50)) +
-  labs(title = paste("Delta Cumulative SOC |", dt_USA$WB_NAME[1]),
-       subtitle = paste0("Scenario: ", scenario_labels[args[3]], " | ", args[4]), 
-       x = "Longitude",
-       y = "Latitude") +
-  theme_minimal() +
-  theme(legend.key.height = unit(2, "cm"))
-
-#-------------------------------------------------------------------------------
-# SOC map (according to dt_filtered)
-#-------------------------------------------------------------------------------
-shp_filtered <- r_shp[r_shp$WB_NAME %in% countries, ]
-dt_filtered <- dt_filtered[, lapply(.SD, mean), .SDcols = c("d_s_SOC", "an_d_s_SOC"),
-                           by = .(gridid, crop, irr, x, y)]
-ggplot(dt_filtered, aes(x = x, y = y, fill = an_d_s_SOC)) +
-  geom_raster() +
-  scale_fill_distiller(palette = "PRGn", direction = 1,
-                       name = "SOC Change\n(Mg C/ha/y)",
-                       breaks = pretty(dt_filtered$an_d_s_SOC, n = 8),
-                       labels = scales::label_number(accuracy = 0.01)) +
-  geom_sf(data = shp_filtered, fill = NA, color = "black", linewidth = 0.5, inherit.aes = F) +
-  labs(title = paste("Delta Cumulative SOC | Regional"),
-       subtitle = paste0("Scenario: ", scenario_labels[args[3]], " | ", args[4]), 
-       x = "Longitude",
-       y = "Latitude") +
-  theme_minimal() +
-  theme(legend.key.height = unit(2, "cm"))
-plot(density(dt_filtered$an_d_s_SOC))
+print(CDF.plot)
