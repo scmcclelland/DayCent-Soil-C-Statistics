@@ -128,7 +128,9 @@ if (file.exists(paste0(
   dt_corn <- fread(paste0(o_path, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], "_corn.csv"))
   dt_soyb <- fread(paste0(o_path, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], "_soyb.csv"))
   dt_wheat<- fread(paste0(o_path, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], "_wheat.csv"))
-} else {
+  
+  
+} else { #if the correct table does not exist, in the output directory, create it.
   message("Table not found. Creating...")
   for (s in c("ccg", "res", "ntill", "ccg-res", "ccg-ntill", "ntill-res")) {
     #reset args

@@ -9,8 +9,6 @@
 #-------------------------------------------------------------------------------
 
 library(data.table)
-library(ggplot2)
-library(ggridges)
 library(stringr)
 library(sf)
 library(terra)
