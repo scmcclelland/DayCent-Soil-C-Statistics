@@ -1,6 +1,6 @@
 # filename:     covariate-analysis.R    
 # created:      30 April 2026
-# last updated: 26 June 2026
+# last updated: 17 July 2026
 # author:       Docker Clark
 
 # description: This script joins daycent scenario tables with covariate tables, filters, and creates exploratory plots to identify additional influences on delta SOC.
@@ -19,6 +19,12 @@ library(rstudioapi)
 #-------------------------------------------------------------------------------
 # directories and startup
 #-------------------------------------------------------------------------------
+#dir = dirname(getActiveDocumentContext()$path)
+#dir = str_split(dir, '/r')
+#dir = dir[[1]][1]
+#setwd(dir)
+
+b_path = paste(dir, 'data', sep = '/')
 #base path
 b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data"
 
@@ -106,6 +112,7 @@ gc() #garbage collection
 # specify regions for filtering
 #-------------------------------------------------------------------------------
 regions <- list(
+  "Global"        = unique(WB_dt[ , WB_NAME]),
   "North America" = c("United States of America", "Canada"),
   "Oceania"       = c('Australia', 'New Zealand'),
   "Europe"        = c('Albania', 'Andorra', 'Austria', 'Belarus', 'Belgium', 'Bosnia and Herzegovina',
@@ -123,26 +130,25 @@ regions <- list(
                       'Germany', 'Greece', 'Hungary', 'Ireland', 'Italy',
                       'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
                       'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
-                      'Spain', 'Sweden'))
+                      'Spain', 'Sweden'),
+  "USA"           = c("United States of America"))
 
 #-------------------------------------------------------------------------------
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "United States of America"
+args[6] <- "USA"
 
-if (args[6] == "Global") {
-  countries <- unique(dt_scenario$WB_NAME)
-} else if (args[6] %in% names(regions)) {
-  countries <- regions[[args[6]]]
-} else if (args[6] %in% dt_scenario$WB_NAME) {
-  countries <- args[6]
-} else {
-  message(args[6], " not found in filter function")
-  countries <- NULL
-}
-#filter according to countries
-dt_filtered <- dt_scenario[WB_NAME %in% countries, ]
+# create and append regional lookup table
+region_dt <- rbindlist(
+  lapply(names(regions), function(r) data.table(region = r, WB_NAME = regions[[r]])))
+
+#allow.cartesian allows for rows to be added when a WB_NAME belongs two region groups
+# ex. France now has duplicate rows labeled "Global" and "European Union"
+dt_scenario <- merge(dt_scenario, region_dt, by = "WB_NAME", allow.cartesian = TRUE)
+
+#filter to correct region
+dt_filtered <- dt_scenario[region == args[6], ]
 
 #annualize SOC as a new column so either can be used
 yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
@@ -165,8 +171,7 @@ dt_covars <- dt_covars[ , .(gridid, crop, irr, ELEV, MINERL_sum_, NITRAT_sum_,
                             RWCF_sum_, SLBLKD, SLCLAY, SLPH, SLSAND)]
 
 
-
-#left join to avoid dropping rows (join by gridcell, rep, crop, and irr)
+#left join to avoid dropping rows (join by gridcell, crop, and irr)
 dt_filtered <- main_table[dt_filtered, on = .(gridid, crop, irr)]
 
 #dt_covars does not split wht into summer and winter

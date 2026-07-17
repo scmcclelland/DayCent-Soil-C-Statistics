@@ -18,6 +18,11 @@ library(stringr)
 #-------------------------------------------------------------------------------
 # directories and startup
 #-------------------------------------------------------------------------------
+#dir = dirname(getActiveDocumentContext()$path)
+#dir = str_split(dir, '/r')
+#dir = dir[[1]][1]
+#setwd(dir)
+
 #base data path
 b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data"
 
@@ -27,7 +32,7 @@ args[2] <- "analysis-output"
 args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
-args[6] <- "Europe"
+args[6] <- "Global"
 
 #assuming shp_p means shapefile path
 shp_p <- paste(b_path, args[1], "shp", sep = "/")
@@ -187,7 +192,7 @@ dt_means <- dt_scenario[, .(
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "Global"
+args[6] <- "USA"
 
 #filter to correct region
 dt_filtered <- dt_scenario[region == args[6], ]
@@ -324,7 +329,9 @@ if (exists("dens")) {
 #call the plot
 print(PDF.plot)
 
-
+ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
+             "/regional_PDF_", args[6], "_", args[3], "_", args[4], ".png"),
+      width = 8.5, height = 5, units = "in", dpi = 300)
 #-------------------------------------------------------------------------------
 # Singular CDF: Cumulative Density Function
 #-------------------------------------------------------------------------------

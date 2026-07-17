@@ -21,6 +21,11 @@ library(rstudioapi)
 #-------------------------------------------------------------------------------
 # directories and startup
 #-------------------------------------------------------------------------------
+#dir = dirname(getActiveDocumentContext()$path)
+#dir = str_split(dir, '/r')
+#dir = dir[[1]][1]
+#setwd(dir)
+
 #base path
 b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data"
 
