@@ -111,15 +111,22 @@ yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
 #set output path for tables and viz
 o_path <- paste(b_path, args[2], args[4], sep = "/")
 
-#first check if the multi-scenario tables exist in the output dir
-#if not, create them and save them there. Note that tables should be manually deleted if user suspects scenario data has changed.
-if (file.exists(paste0(
-  o_path, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], ".csv"))) {
+
+input_file  <- paste0(b_path, "/", args[1], "/",      #base file path
+                      args[4], "/", args[5], "-",     #time scale & SOC delta
+                      args[3],".RData") 
+output_file <- paste0(o_path, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], ".csv")
+
+input_time  <- file.info(input_file)$mtime
+output_time <- file.info(output_file)$mtime
+
+#compare last mod date of input and output to know if update is needed
+needs_rerun <- !file.exists(output_file) ||
+  file.info(input_file)$mtime > file.info(output_file)$mtime
+
+if (needs_rerun) {
   message("Data tables found in output directory. Loading in as: ''")
-  
-  
-} else { #if the correct table does not exist, in the output directory, create it.
-  message("Table not found. Creating...")
+  message("Table not found or out of date. Creating...")
   time <- Sys.time() #track how long this takes 
   for (s in c("ccg", "res", "ntill", "ccg-res", "ccg-ntill", "ntill-res")) {
     #reset args
@@ -185,4 +192,8 @@ if (file.exists(paste0(
       rm(time, duration) #delete after
     }  
   }
+} else { #if the correct table doe exist, in the output directory, load it.
+  message("Data are up to date. Loading in...")
+  dt_plot <- fread(output_file)
+
 }
