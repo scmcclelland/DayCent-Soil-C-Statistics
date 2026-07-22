@@ -4,6 +4,7 @@
 # author:       Docker Clark
 
 # description: This script creates and/or saves a multi-scenario CDF visualization.
+# for ggplot visualization only, we take a stratified random sample of global data to reduce processing time and memory use.
 #-------------------------------------------------------------------------------
 # libraries 
 #-------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 # filename:     multi-CDF-table.R    
 # created:      16 July 2026
-# last updated: 16 July 2026
+# last updated: 22 July 2026
 # author:       Docker Clark
 
 # description: This script creates, saves, and/or loads a large data.table object for the subsequent creation of a multi-CDF plot.
@@ -31,7 +31,7 @@ args[2] <- "analysis-output"
 args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
-args[6] <- "Global"
+args[6] <- "USA"
 
 #for later labeling
 scenario_labels <- c(
@@ -100,7 +100,8 @@ regions <- list(
                        'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
                        'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
                        'Spain', 'Sweden'),
-  "USA"            = c("United States of America"))
+  "USA"            = c("United States of America"),
+  "Brazil"         = c("Brazil"))
 
 #-------------------------------------------------------------------------------
 # Create or load multi-scenario tables for CDFs
@@ -124,8 +125,8 @@ output_time <- file.info(output_file)$mtime
 needs_rerun <- !file.exists(output_file) ||
   file.info(input_file)$mtime > file.info(output_file)$mtime
 
+# can also manually set needs_rerun to TRUE if user wants to rerun tables
 if (needs_rerun) {
-  message("Data tables found in output directory. Loading in as: ''")
   message("Table not found or out of date. Creating...")
   time <- Sys.time() #track how long this takes 
   for (s in c("ccg", "res", "ntill", "ccg-res", "ccg-ntill", "ntill-res")) {
@@ -190,7 +191,7 @@ if (needs_rerun) {
       rm(time, duration) #delete after
     }  
   }
-} else { #if the correct table doe exist, in the output directory, load it.
+} else { #if the correct table does exist in the output directory, load it.
   message("Data are up to date. Loading in...")
   dt_plot <- fread(output_file)
 
