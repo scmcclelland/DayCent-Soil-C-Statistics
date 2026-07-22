@@ -150,9 +150,10 @@ if (file.exists(paste0(
     rm(time, duration) #delete after
     
     # join country data table to simulation data
-    dt_scenario <- dt_scenario[WB_dt[,c('cell', 'WB_NAME', "x", "y")], on = .(gridid = cell)]
-    # remove NAs
-    dt_scenario <- dt_scenario[!is.na(crop)]
+    dt_scenario <- WB_dt[, c('cell', 'WB_NAME', 'x', 'y')][dt_scenario, on = .(cell = gridid)]
+    
+    #rename cell to avoid confusion
+    setnames(dt_scenario, "cell", "gridid")
     setorder(dt_scenario, gridid)
     gc() #garbage collection
     
@@ -176,9 +177,6 @@ if (file.exists(paste0(
     #annualize SOC as a new column so either can be used
     yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
     dt_filtered[, an_d_s_SOC := d_s_SOC / yrs]
-    
-    #remove rows w/ non-finite vals for annual SOC change
-    dt_filtered <- dt_filtered[!is.na(an_d_s_SOC), ]
     
     #filter to only necessary cols
     dt_filtered <- dt_filtered[ , .(gridid, crop, irr, rep, an_d_s_SOC)]

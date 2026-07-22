@@ -1,6 +1,6 @@
 # filename:     covariate-analysis.R    
 # created:      30 April 2026
-# last updated: 17 July 2026
+# last updated: 22 July 2026
 # author:       Docker Clark
 
 # description: This script joins daycent scenario tables with covariate tables, filters, and creates exploratory plots to identify additional influences on delta SOC.
@@ -23,9 +23,8 @@ library(rstudioapi)
 #dir = str_split(dir, '/r')
 #dir = dir[[1]][1]
 #setwd(dir)
-
-b_path = paste(dir, 'data', sep = '/')
-#base path
+#b_path = paste(dir, 'data', sep = '/')
+#base path (delete hard-coded path later)
 b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data"
 
 args    <- commandArgs(trailingOnly = TRUE) 
@@ -102,9 +101,11 @@ WB_dt <- create_WB_cty(r_shp, r)
   rm(time, duration) #delete after
 }
 # join country data table to simulation data
-dt_scenario <- dt_scenario[WB_dt[,c('cell', 'WB_NAME', "x", "y")], on = .(gridid = cell)]
-# remove NAs
-dt_scenario <- dt_scenario[!is.na(crop)]
+dt_scenario <- WB_dt[, c('cell', 'WB_NAME', 'x', 'y')][dt_scenario, on = .(cell = gridid)]
+
+#rename cell to avoid confusion
+setnames(dt_scenario, "cell", "gridid")
+
 setorder(dt_scenario, gridid)
 gc() #garbage collection
 
@@ -147,7 +148,7 @@ region_dt <- rbindlist(
 # ex. France now has duplicate rows labeled "Global" and "European Union"
 dt_scenario <- merge(dt_scenario, region_dt, by = "WB_NAME", allow.cartesian = TRUE)
 
-#filter to correct region
+#filter to correct region (including global. this re-collapses any rows added above)
 dt_filtered <- dt_scenario[region == args[6], ]
 
 #annualize SOC as a new column so either can be used
@@ -193,8 +194,6 @@ plot(density(dt_filtered[, MINERL_sum_], na.rm = T))
 dt_filtered[, log_minerl := log(MINERL_sum_)]
 plot(density(dt_filtered[, log_minerl], na.rm = T))
 
-#remove rows w/ non-finite vals for annual SOC Change
-dt_filtered <- dt_filtered[!is.na(an_d_s_SOC), ]
 
 #split dt by crop for later
 dt_corn <- dt_filtered[crop == "maiz", ]

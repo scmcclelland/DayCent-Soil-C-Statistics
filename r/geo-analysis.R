@@ -97,9 +97,10 @@ create_WB_cty <- function(shp_f, rst) {
 # create country data table with function
 WB_dt <- create_WB_cty(r_shp, r)
 # join country data table to simulation data
-dt_scenario <- dt_scenario[WB_dt[,c('cell', 'WB_NAME', "x", "y")], on = .(gridid = cell)]
-# remove NAs
-dt_scenario <- dt_scenario[!is.na(crop)]
+dt_scenario <- WB_dt[, c('cell', 'WB_NAME', 'x', 'y')][dt_scenario, on = .(cell = gridid)]
+
+#rename cell to avoid confusion
+setnames(dt_scenario, "cell", "gridid")
 setorder(dt_scenario, gridid)
 gc() #garbage collection
 
@@ -162,7 +163,8 @@ regions <- list(
                        'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
                        'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
                        'Spain', 'Sweden'),
-  "USA"            = c("United States of America"))
+  "USA"            = c("United States of America"),
+  "Brazil"         = c("Brazil"))
 
 #-------------------------------------------------------------------------------
 # Shared Themes
