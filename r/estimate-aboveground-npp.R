@@ -1,6 +1,6 @@
 # file name:    estimate-aboveground-npp.R
 # created:      07 July 2026
-# last updated: 07 July 2026
+# last updated: 20 July 2026
 # author:       S.C. McClelland
 
 # description: This file estimates aboveground NPP removal. Run manually.
@@ -16,7 +16,7 @@ library(stringr)
 args   = commandArgs(trailingOnly = TRUE)
 if (isFALSE(length(args) == 1))
   stop(
-    'Needs 2 command-line argument (scenario selection).'
+    'Needs 1 command-line argument (scenario selection).'
   )
 # args[1] [scenario selection]
 #-------------------------------------------------------------------------------
@@ -106,7 +106,7 @@ if(args[1] == 'conv') {
   dt_HI = dt_HI[main_table, on = .(gridid = gridid,
                                    crop   = crop,
                                    irr    = irr)]
-  dt_HI = dt_HI[!is.na(scenario)]
+  dt_HI = dt_HI[!is.na(scenario)] # drop missing main_table when joined
   dt_HI[, fr := 1-res.rtrn.amt]
 } else {
   print('This scenario includes 100% residue retention.')
