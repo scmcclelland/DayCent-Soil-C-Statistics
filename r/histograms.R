@@ -128,7 +128,7 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
   scale_x_continuous(
     breaks = seq(-1, 4, by = 0.5),
     limits = c(-1, 4)) +
-  labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Sequestration Over" ~ .(yrs) ~ "Years"),
+  labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Change Over" ~ .(yrs) ~ "Years"),
        y = NULL,
        title = "Distribution of Summary Statistics",
        subtitle = paste0("Scenario - ", scenario_labels[args[1]]),
@@ -248,7 +248,7 @@ fillcols <- cat_cols[1:ncol(dt_scenario_means)]
 ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
   geom_histogram(alpha = 0.5, bins = 150, position = "identity") +
   scale_fill_manual(values = fillcols, labels = scenario_labels) +
-  labs(x = expression("Mean SOC Sequestration (Mg ha"^-1~"yr"^-1*")"),
+  labs(x = expression("Mean SOC Change (Mg ha"^-1~"yr"^-1*")"),
        y = "Frequency",
        fill = "Scenario",
        title = "Distribution of Scenario Means") +
@@ -272,7 +272,7 @@ ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
 ggplot(dt_meds_long, aes(x = med_SOC, fill = scenario)) +
   geom_histogram(alpha = 0.5, bins = 150, position = "identity") +
   scale_fill_manual(values = fillcols, labels = scenario_labels) +
-  labs(x = expression("Median SOC Sequestration (Mg ha"^-1~"yr"^-1*")"),
+  labs(x = expression("Median SOC Change (Mg ha"^-1~"yr"^-1*")"),
        y = "Frequency",
        fill = "Scenario",
        title = "Distribution of Scenario Medians") +

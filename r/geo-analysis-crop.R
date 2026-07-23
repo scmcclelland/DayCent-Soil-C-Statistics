@@ -1,9 +1,10 @@
 # filename:     geo-analysis-crop.R    
-# created:      20 April 2026
+# created:      16 July 2026
 # last updated: 17 July 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales.
+# It produces statistical visualizations split by crop monoculture.
 #-------------------------------------------------------------------------------
 # libraries 
 #-------------------------------------------------------------------------------
@@ -32,7 +33,7 @@ args[2] <- "analysis-output"
 args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
-args[6] <- "Global"
+args[6] <- "Europe"
 
 #assuming shp_p means shapefile path
 shp_p <- paste(b_path, args[1], "shp", sep = "/")
@@ -163,38 +164,13 @@ regions <- list(
                        'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
                        'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
                        'Spain', 'Sweden'),
-  "USA"            = c("United States of America"),
-  "Brazil"         = c("Brazil"))
-
-#-------------------------------------------------------------------------------
-# Shared Themes
-#-------------------------------------------------------------------------------
-#color schemes (continuous)
-linecols <- viridis::viridis(6)
-
-#color schemes (categorical)
-cat_cols <- c("#66C2A5","#FC8D62","#8DA0CB","#E78AC3","#A6D854","#FFD92F","#E5C494","#B3B3B3")
-
-#-------------------------------------------------------------------------------
-# Populate data table for regional histogram
-#-------------------------------------------------------------------------------
-# create and append regional lookup table
-region_dt <- rbindlist(
-  lapply(names(regions), function(r) data.table(region = r, WB_NAME = regions[[r]])))
-
-#allow.cartesian allows for rows to be added when a WB_NAME belongs two region groups
-# ex. France now has duplicate rows labeled "Global" and "European Union"
-dt_scenario <- merge(dt_scenario, region_dt, by = "WB_NAME", allow.cartesian = TRUE)
-
-dt_means <- dt_scenario[, .(
-  Mean   = mean(an_d_s_SOC)), 
-  by = .(region, rep)]
+  "USA"            = c("United States of America"))
 
 #-------------------------------------------------------------------------------
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "USA"
+args[6] <- "Global"
 
 #filter to correct region
 dt_filtered <- dt_scenario[region == args[6], ]
@@ -212,169 +188,124 @@ dt_stats <- dt_filtered[, .(
   Max = max(an_d_s_SOC)), 
   by = .(rep)] 
 
-#melt data to long for read-in to ggplot
-dt_long <- melt(dt_stats,
-                measure.vars = setdiff(colnames(dt_stats), "rep"),
-                variable.name = "statistic",
-                value.name = "SOC")
-
 #-------------------------------------------------------------------------------
-# Sub-Global Ridgeline plot
+# Shared Themes
 #-------------------------------------------------------------------------------
-ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
-  geom_density_ridges(alpha = 0.6, rel_min_height = 0.01,
-                      color = "gray20", linewidth = 0.4,
-                      bandwidth = 0.035) + #binwidth for smoothing
-  scale_fill_manual(values = linecols) +
-  scale_x_continuous(
-    breaks = seq(-1, 4, by = 0.5),
-    limits = c(-1, 4)) +
-  labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Change Over" ~ .(yrs) ~ "Years"),
-       y = NULL,
-       title = "Distribution of Summary Statistics",
-       subtitle = paste0(args[6], " | ", "Scenario - ", scenario_labels[args[3]]),
-       caption = "Variation from 1,001 Monte Carlo draws") +
-  theme_ridges(font_family = "sans") +
-  theme(
-    legend.position    = "none",
-    plot.title         = element_text(size = 13, face = "bold"),
-    plot.subtitle      = element_text(size = 11),
-    plot.caption       = element_text(size = 8, color = "grey50"),
-    axis.text          = element_text(size = 10),
-    axis.title.x       = element_text(size = 11),
-    panel.grid.major.x = element_line(color = "grey90"),
-    plot.background    = element_rect(fill = "white", color = NA),
-    plot.margin        = margin(15, 15, 10, 10)
-  )
+#color schemes (continuous)
+linecols <- viridis::viridis(6)
 
-#-------------------------------------------------------------------------------
-# Multi-Region Histogram
-#-------------------------------------------------------------------------------
-region_levels <- sort(unique(dt_means$region))
-fillcols <- setNames(cat_cols[1:length(region_levels)], region_levels)
-
-ggplot(dt_means) +
-  geom_histogram(aes(x = Mean, fill = region), alpha = 0.5, bins = 100) +
-  scale_fill_manual(values = fillcols) +
-  labs(x = expression("Mean SOC Change (Mg ha"^-1~"yr"^-1*")"),
-       y = "Frequency",
-       fill = "Region",
-       title = "Distribution of Monte Carlo Means",
-       subtitle = paste0(yrs, " Years | ", "Scenario: ", scenario_labels[args[3]])) +
-  theme_classic() +
-  theme(legend.position = c(0.85, 0.75),
-        legend.background = element_rect(fill = "white", color = "grey90"))
-
-#smoothed regional histogram
-ggplot(dt_means) +
-  geom_density(aes(x = Mean, fill = region, color = region), 
-               alpha = 0.5, linewidth = 0.75) +
-  scale_fill_manual(values = fillcols) +
-  scale_color_manual(values = fillcols) +
-  labs(x = expression("Mean SOC Change (Mg ha"^-1~"yr"^-1*")"),
-       y = "Frequency",
-       fill = "Region",
-       color = "Region",
-       title = "Distribution of Monte Carlo Means",
-       subtitle = paste0(yrs, " Years | ", "Scenario: ", scenario_labels[args[3]])) +
-  theme_classic() +
-  theme(legend.position = c(0.85, 0.75),
-        legend.background = element_rect(fill = "white", color = "grey90"))
-
-#ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
-#              "/regional_hist_", args[3], "_", args[4], ".png"),
-#       width = 8.5, height = 5, units = "in", dpi = 300)
+#color schemes (categorical)
+cat_cols <- c("#66C2A5","#FC8D62","#8DA0CB","#E78AC3","#A6D854","#FFD92F","#E5C494","#B3B3B3")
 
 #-------------------------------------------------------------------------------
 # PDF: Probability Density Function
 #-------------------------------------------------------------------------------
-#a function which allows calculation of probabilities from PDFs and CDFs
-ecdf_fn <- ecdf(dt_filtered$an_d_s_SOC)
-#specify a probability range to highlight if desired. otherwise skip
-#between x1 (lower bound) and x2 (upper bound)
-x1 <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.95))
-x2 <- quantile(dt_filtered$an_d_s_SOC, probs = c(1))
-prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
-#precompute density so we can shade a region
-dens <- density(dt_filtered$an_d_s_SOC, adjust = 2)
-dens_dt <- data.table(x = dens$x, y = dens$y)
+#split dataset by crop
+dt_corn <- dt_filtered[crop == "maiz",]
+dt_soyb <- dt_filtered[crop == "soyb",]
+dt_wheat <- dt_filtered[crop %in% c("swht", "wwht"), ]
 
+#crop names for plot labels
+crop_names <- c("corn" = "Corn",
+                "soyb" = "Soy",
+                "wheat" = "Wheat")
 
-PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
-  geom_density(fill = "#4e9d7e", color = "#2d6e56", 
-               alpha = 0.6, linewidth = 0.8, adjust = 2) +
-  labs(title = paste("PDF: Soil Carbon Change Distribution", args[6], sep = " | "),
-       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
-       x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
-       y = "Probability Density") +
-  theme_minimal(base_size = 13) +
-  theme(
-    panel.grid.minor   = element_blank(),
-    plot.title         = element_text(size = 13, face = "bold"),
-    plot.subtitle      = element_text(size = 11),
-    axis.text          = element_text(size = 10),
-    axis.title         = element_text(size = 11),
-    axis.line          = element_line(color = "grey70"),
-    plot.background    = element_rect(fill = "white", color = NA),
-    plot.margin        = margin(15, 15, 10, 10)) +
-  scale_x_continuous(breaks = seq(-0.5, 2.5, by = 0.5)) +
-  coord_cartesian(xlim = c(-0.5, 2.5))
-if (exists("dens")) {
-  PDF.plot <- PDF.plot +
-    geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
-                aes(x = x, ymin = 0, ymax = y),
-                fill = "#e8a020", alpha = 0.6) +
-    annotate("text", x = 1.75, y = 0.5,
-             label = paste0("Upper 5th percentile:\n ", round(x1, 2), " < X < ", round(x2, 2)),
-             size = 4, fontface = "bold") 
+# This loop creates 3 (crop-filtered) PDFs for the chosen region/timescale/scenario. 
+for (crop in c("corn", "soyb", "wheat")) {
+  dt_plot <- get(paste0("dt_", crop))
+  
+  #a function which allows calculation of probabilities from PDFs and CDFs
+  ecdf_fn <- ecdf(dt_plot$an_d_s_SOC)
+  #specify a probability range to highlight if desired. otherwise skip
+  #between x1 (lower bound) and x2 (upper bound)
+  x1 <- quantile(dt_plot$an_d_s_SOC, probs = c(0.95))
+  x2 <- quantile(dt_plot$an_d_s_SOC, probs = c(1))
+  prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
+  #precompute density so we can shade a region
+  dens <- density(dt_plot$an_d_s_SOC, adjust = 2)
+  dens_dt <- data.table(x = dens$x, y = dens$y)
+  
+  
+  PDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
+    geom_density(fill = "#4e9d7e", color = "#2d6e56",
+                 alpha = 0.6, linewidth = 0.8,
+                 adjust = 2) +
+    labs(title = paste("PDF: Soil Carbon Change Distribution", args[6], 
+                       crop_names[crop], sep = " | "),
+         subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
+         x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
+         y = "Probability Density") +
+    theme_minimal(base_size = 13) +
+    theme(
+      panel.grid.minor   = element_blank(),
+      plot.title         = element_text(size = 13, face = "bold"),
+      plot.subtitle      = element_text(size = 11),
+      axis.text          = element_text(size = 10),
+      axis.title         = element_text(size = 11),
+      axis.line          = element_line(color = "grey70"),
+      plot.background    = element_rect(fill = "white", color = NA),
+      plot.margin        = margin(15, 15, 10, 10)) +
+    scale_x_continuous(
+      breaks = seq(-0.5, 2.5, by = 0.5),
+      limits = c(-0.5, 2.5))
+  if (exists("dens")) {
+    PDF.plot <- PDF.plot +
+      geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
+                  aes(x = x, ymin = 0, ymax = y),
+                  fill = "#e8a020", alpha = 0.6) +
+      annotate("text", x = 1.75, y = 0.5,
+               label = paste0("Upper 5th percentile:\n ", round(x1, 2), " < X < ", round(x2, 2)),
+               size = 4, fontface = "bold") 
+  }
+  #call the plot
+  print(PDF.plot)
 }
-#call the plot
-print(PDF.plot)
 
-ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
-             "/regional_PDF_", args[6], "_", args[3], "_", args[4], ".png"),
-      width = 8.5, height = 5, units = "in", dpi = 300)
 #-------------------------------------------------------------------------------
 # Singular CDF: Cumulative Density Function
 #-------------------------------------------------------------------------------
-#a function which allows calculation of probabilities from PDFs and CDFs
-ecdf_fn <- ecdf(dt_filtered$an_d_s_SOC)
-#specify a threshold value to point out in an annotation
-soc.thresh <- (0.5)
-cdf.line <- ecdf_fn(soc.thresh)
-
-CDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
-  stat_ecdf(geom = "step", linewidth = 1.2, color = "#2d6e56") +
-  geom_hline(yintercept = c(0.05, 0.5, 0.95),
-             linetype = "dotted", color = "gray50", alpha = 0.6) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  labs(title = paste(args[6], "CDF: Soil Carbon Change Distribution", sep = " | "),
-       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
-       x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
-       y = "Cumulative Probability") +
-  theme_bw() +
-  theme(
-    plot.title      = element_text(size = 13, face = "bold"),
-    plot.subtitle   = element_text(size = 11),
-    axis.text       = element_text(size = 10),
-    axis.title      = element_text(size = 11),
-    plot.background = element_rect(fill = "white", color = NA),
-    plot.margin     = margin(15, 15, 10, 10)) +
-  scale_x_continuous(breaks = seq(0, 3, by = 0.5)) +
-  coord_cartesian(xlim = c(0, 2.5))
-if (exists("soc.thresh")) {
-  CDF.plot <- CDF.plot +
-    annotate("segment", x = soc.thresh, xend = soc.thresh,
-             y = -Inf, yend = cdf.line,
-             linetype = "dashed", color = "#e8a020", linewidth = 0.8) +
-    annotate("segment", x = -Inf, xend = soc.thresh,
-             y = cdf.line, yend = cdf.line,
-             linetype = "dashed", color = "#e8a020", linewidth = 0.8) +
-    annotate("point", x = soc.thresh, y = cdf.line, 
-             color = "#2d6e56", size = 2, shape = 21, fill = "#e8a020") +
-    annotate("text", x = (soc.thresh + 0.05), y = cdf.line,
-             label = paste0("P(X ≤ ", soc.thresh, ") = ", 100*(round(cdf.line, 3)), "%"),
-             hjust = -0.1, size = 3.5, fontface = "bold")
+for (crop in c("corn", "soyb", "wheat")) {
+  dt_plot <- get(paste0("dt_", crop))
+  
+  #a function which allows calculation of probabilities from PDFs and CDFs
+  ecdf_fn <- ecdf(dt_plot$an_d_s_SOC)
+  #specify a threshold value to point out in an annotation
+  soc.thresh <- (0.5)
+  cdf.line <- ecdf_fn(soc.thresh)
+  
+  CDF.plot <- ggplot(dt_plot, aes(x = an_d_s_SOC)) +
+    stat_ecdf(geom = "step", linewidth = 1.2, color = "#2d6e56") +
+    geom_hline(yintercept = c(0.05, 0.5, 0.95),
+               linetype = "dotted", color = "gray50", alpha = 0.6) +
+    scale_y_continuous(labels = scales::percent_format()) +
+    labs(title = paste(args[6], "CDF: Soil Carbon Change Distribution", crop_names[crop], sep = " | "),
+         subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
+         x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
+         y = "Cumulative Probability") +
+    theme_bw() +
+    theme(
+      plot.title      = element_text(size = 13, face = "bold"),
+      plot.subtitle   = element_text(size = 11),
+      axis.text       = element_text(size = 10),
+      axis.title      = element_text(size = 11),
+      plot.background = element_rect(fill = "white", color = NA),
+      plot.margin     = margin(15, 15, 10, 10)) +
+    scale_x_continuous(breaks = seq(0, 3, by = 0.5)) +
+    coord_cartesian(xlim = c(0, 2.5))
+  if (exists("soc.thresh")) {
+    CDF.plot <- CDF.plot +
+      annotate("segment", x = soc.thresh, xend = soc.thresh,
+               y = -Inf, yend = cdf.line,
+               linetype = "dashed", color = "#e8a020", linewidth = 0.8) +
+      annotate("segment", x = -Inf, xend = soc.thresh,
+               y = cdf.line, yend = cdf.line,
+               linetype = "dashed", color = "#e8a020", linewidth = 0.8) +
+      annotate("point", x = soc.thresh, y = cdf.line, 
+               color = "#2d6e56", size = 2, shape = 21, fill = "#e8a020") +
+      annotate("text", x = (soc.thresh + 0.05), y = cdf.line,
+               label = paste0("P(X ≤ ", soc.thresh, ") = ", 100*(round(cdf.line, 3)), "%"),
+               hjust = -0.1, size = 3.5, fontface = "bold")
+  }
+  #call the plot
+  print(CDF.plot)
 }
-#call the plot
-print(CDF.plot)
