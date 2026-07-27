@@ -1,6 +1,6 @@
 # filename:     geo-analysis-crop.R    
 # created:      20 April 2026
-# last updated: 17 July 2026
+# last updated: 27 July 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales.
@@ -282,6 +282,7 @@ ggplot(dt_means) +
        color = "Region",
        title = "Distribution of Monte Carlo Means",
        subtitle = paste0(yrs, " Years | ", "Scenario: ", scenario_labels[args[3]])) +
+  coord_cartesian(xlim = c(0, 2))
   theme_classic() +
   theme(legend.position = c(0.85, 0.75),
         legend.background = element_rect(fill = "white", color = "grey90"))
@@ -308,14 +309,23 @@ ecdf_fn <- ecdf(dt_filtered$an_d_s_SOC)
 mux <-  mean(dt_filtered[, an_d_s_SOC])
 medx <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.5))
 p75x <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.75))
-m90x <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.9))
+p90x <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.9))
 
+#adapted for paneled display. 
 PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
   geom_density(fill = "#4e9d7e", color = "#2d6e56", 
                alpha = 0.6, linewidth = 0.8, adjust = 2) +
-  geom_vline(xintercept = mux, color = "#e8a020") +
-  geom_vline(xintercept = mux, color = "#e8a020") +
-  labs(title = paste("PDF: Soil Carbon Change Distribution", args[6], sep = " | "),
+  geom_vline(aes(xintercept = mux,  color = "Mean"),    linewidth = 1, key_glyph = draw_key_path) +
+  geom_vline(aes(xintercept = medx, color = "Median"),  linewidth = 1, key_glyph = draw_key_path) +
+  geom_vline(aes(xintercept = p75x, color = "P75"),     linewidth = 1, key_glyph = draw_key_path) +
+  geom_vline(aes(xintercept = p90x, color = "P90"),     linewidth = 1, key_glyph = draw_key_path) +
+  scale_color_manual(
+    name = "Summary Stat",
+    values = c("Mean"   = "#77877B",
+               "Median" = "#8A89C0",
+               "P75"    = "#A07178",
+               "P90"    = "#e8a020")) +
+  labs(#title = paste("PDF: Soil Carbon Change Distribution", args[6], sep = " | "),
        subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
        x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
        y = "Probability Density") +
@@ -342,6 +352,10 @@ if (exists("dens")) {
 }
 #call and assign the plot
 print(PDF.plot)
+
+#remove legend from plot panels 
+PDF.plot <- PDF.plot + geom_line() + theme(legend.position = "none")
+assign(paste0(gsub("-", "_", args[3]), "_PDF.plot"), PDF.plot)
 
 ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
              "/regional_PDF_", args[6], "_", args[3], "_", args[4], ".png"),
