@@ -331,10 +331,6 @@ if (args[6] == "Global") {
 PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
   geom_density(fill = "#4e9d7e", color = "#2d6e56", 
                alpha = 0.6, linewidth = 0.8, adjust = 2) +
-#  geom_vline(aes(xintercept = mux,  color = "Mean"),    linewidth = 1, key_glyph = draw_key_path) +
-#  geom_vline(aes(xintercept = medx, color = "Median"),  linewidth = 1, key_glyph = draw_key_path) +
-#  geom_vline(aes(xintercept = p75x, color = "P75"),     linewidth = 1, key_glyph = draw_key_path) +
-#  geom_vline(aes(xintercept = p90x, color = "P90"),     linewidth = 1, key_glyph = draw_key_path) +
   geom_vline(data = stat_dt,
              aes(xintercept = value, color = stat),
              linewidth = 1, key_glyph = draw_key_path) +
