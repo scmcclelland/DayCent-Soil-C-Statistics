@@ -196,7 +196,7 @@ dt_means <- dt_scenario[, .(
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "USA"
+args[6] <- "Global"
 
 #filter to correct region
 dt_filtered <- dt_scenario[region == args[6], ]
@@ -335,7 +335,7 @@ PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
              aes(xintercept = value, color = stat),
              linewidth = 1, key_glyph = draw_key_path) +
   scale_color_manual(
-    name = "Summary Stat",
+    name = "Summary\nStatistics",
     values = c("Mean"   = "#77877B",
                "Median" = "#8A89C0",
                "P75"    = "#A07178",
@@ -354,8 +354,8 @@ PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
     axis.line          = element_line(color = "grey70"),
     plot.background    = element_rect(fill = "white", color = NA),
     plot.margin        = margin(15, 15, 10, 10)) +
-  scale_x_continuous(breaks = seq(-0.5, 2.5, by = 0.5)) +
-  coord_cartesian(xlim = c(-0.5, 2.5))
+  scale_x_continuous(breaks = seq(0, 2.5, by = 0.5)) +
+  coord_cartesian(xlim = c(-0.05, 2.5))
 if (exists("dens")) {
   PDF.plot <- PDF.plot +
     geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
