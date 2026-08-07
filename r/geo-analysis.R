@@ -1,9 +1,10 @@
 # filename:     geo-analysis-crop.R    
 # created:      20 April 2026
-# last updated: 17 July 2026
+# last updated: 30 July 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales.
+# For global paneled PDF visualization, stratified random sampling to conserve resources.
 #-------------------------------------------------------------------------------
 # libraries 
 #-------------------------------------------------------------------------------
@@ -14,6 +15,7 @@ library(terra)
 library(ggplot2)
 library(ggridges)
 library(stringr)
+library(cowplot)
 
 #-------------------------------------------------------------------------------
 # directories and startup
@@ -176,7 +178,7 @@ linecols <- viridis::viridis(6)
 cat_cols <- c("#66C2A5","#FC8D62","#8DA0CB","#E78AC3","#A6D854","#FFD92F","#E5C494","#B3B3B3")
 
 #-------------------------------------------------------------------------------
-# Populate data table for regional histogram
+# Populate data table for regional analysis
 #-------------------------------------------------------------------------------
 # create and append regional lookup table
 region_dt <- rbindlist(
@@ -194,7 +196,7 @@ dt_means <- dt_scenario[, .(
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "USA"
+args[6] <- "Global"
 
 #filter to correct region
 dt_filtered <- dt_scenario[region == args[6], ]
@@ -204,12 +206,14 @@ dt_filtered <- dt_scenario[region == args[6], ]
 #-------------------------------------------------------------------------------
 #summary stats
 dt_stats <- dt_filtered[, .(
-  Min = min(an_d_s_SOC),
-  P25 = quantile(an_d_s_SOC, probs = 0.25),
+#  Min = min(an_d_s_SOC),
+#  P25 = quantile(an_d_s_SOC, probs = 0.25),
   Median = quantile(an_d_s_SOC, probs = 0.50),
-  Mean = mean(an_d_s_SOC),
+#  Mean = mean(an_d_s_SOC),
   P75 = quantile(an_d_s_SOC, probs = 0.75),
-  Max = max(an_d_s_SOC)), 
+  P90 = quantile(an_d_s_SOC, probs = 0.90)
+#  Max = max(an_d_s_SOC)
+  ), 
   by = .(rep)] 
 
 #melt data to long for read-in to ggplot
@@ -222,14 +226,14 @@ dt_long <- melt(dt_stats,
 # Sub-Global Ridgeline plot
 #-------------------------------------------------------------------------------
 ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
-  geom_density_ridges(alpha = 0.6, rel_min_height = 0.01,
+  geom_density_ridges(alpha = 0.6, rel_min_height = 0.005,
                       color = "gray20", linewidth = 0.4,
-                      bandwidth = 0.035) + #binwidth for smoothing
+                      bandwidth = 0.013) + #binwidth for smoothing
   scale_fill_manual(values = linecols) +
   scale_x_continuous(
-    breaks = seq(-1, 4, by = 0.5),
-    limits = c(-1, 4)) +
-  labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Change Over" ~ .(yrs) ~ "Years"),
+    breaks = seq(0, 2, by = 0.5)) +
+  coord_cartesian(xlim = c(0,2), clip = "off") +
+  labs(x = bquote("SOC Change"~"Mg ha"^-1~"y"^-1),
        y = NULL,
        title = "Distribution of Summary Statistics",
        subtitle = paste0(args[6], " | ", "Scenario - ", scenario_labels[args[3]]),
@@ -246,6 +250,9 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
     plot.background    = element_rect(fill = "white", color = NA),
     plot.margin        = margin(15, 15, 10, 10)
   )
+ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
+              "/ridgeline_", args[3], "_", args[4], "_", args[6], ".png"),
+       width = 8.5, height = 5, units = "in", dpi = 300)
 
 #-------------------------------------------------------------------------------
 # Multi-Region Histogram
@@ -277,6 +284,7 @@ ggplot(dt_means) +
        color = "Region",
        title = "Distribution of Monte Carlo Means",
        subtitle = paste0(yrs, " Years | ", "Scenario: ", scenario_labels[args[3]])) +
+  coord_cartesian(xlim = c(0.5, 1)) +
   theme_classic() +
   theme(legend.position = c(0.85, 0.75),
         legend.background = element_rect(fill = "white", color = "grey90"))
@@ -289,21 +297,50 @@ ggplot(dt_means) +
 # PDF: Probability Density Function
 #-------------------------------------------------------------------------------
 #a function which allows calculation of probabilities from PDFs and CDFs
-ecdf_fn <- ecdf(dt_filtered$an_d_s_SOC)
-#specify a probability range to highlight if desired. otherwise skip
-#between x1 (lower bound) and x2 (upper bound)
-x1 <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.95))
-x2 <- quantile(dt_filtered$an_d_s_SOC, probs = c(1))
-prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
-#precompute density so we can shade a region
-dens <- density(dt_filtered$an_d_s_SOC, adjust = 2)
-dens_dt <- data.table(x = dens$x, y = dens$y)
+#ecdf_fn <- ecdf(dt_filtered$an_d_s_SOC)
+##specify a probability range to highlight if desired. otherwise skip
+##between x1 (lower bound) and x2 (upper bound)
+#x1 <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.95))
+#x2 <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.1))
+#prob_range <- ecdf_fn(x2) - ecdf_fn(x1)
+##precompute density so we can shade a region
+#dens <- density(dt_filtered$an_d_s_SOC, adjust = 2)
+#dens_dt <- data.table(x = dens$x, y = dens$y)
 
+# no shading under the curve, instead annotate mean, med, P75, and P90 with lines
+mux <-  mean(dt_filtered[, an_d_s_SOC])
+medx <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.5))
+p75x <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.75))
+p90x <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.9))
 
+#create data table to allow for dynamic annotations
+stat_dt <- data.table(
+  stat  = factor(c("Mean", "Median", "P75", "P90"),
+                 levels = c("Mean", "Median", "P75", "P90")),
+  value = c(mux, medx, p75x, p90x))
+
+#speed up render via stratified random sampling
+if (args[6] == "Global") { 
+  k <- 5000000 # k = total sample size 
+  set.seed(07272026)
+  #dt_filtered <- dt_filtered[, .SD[sample(.N, min(.N, k))], by = WB_NAME] 
+  dt_filtered <- dt_filtered[sample(.N, min(.N, k))] #
+}
+
+#adapted for paneled display. 
 PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
   geom_density(fill = "#4e9d7e", color = "#2d6e56", 
                alpha = 0.6, linewidth = 0.8, adjust = 2) +
-  labs(title = paste("PDF: Soil Carbon Change Distribution", args[6], sep = " | "),
+  geom_vline(data = stat_dt,
+             aes(xintercept = value, color = stat),
+             linewidth = 1, key_glyph = draw_key_path) +
+  scale_color_manual(
+    name = "Summary\nStatistics",
+    values = c("Mean"   = "#77877B",
+               "Median" = "#8A89C0",
+               "P75"    = "#A07178",
+               "P90"    = "#e8a020")) +
+  labs(#title = paste("PDF: Soil Carbon Change Distribution", args[6], sep = " | "),
        subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
        x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
        y = "Probability Density") +
@@ -317,8 +354,8 @@ PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
     axis.line          = element_line(color = "grey70"),
     plot.background    = element_rect(fill = "white", color = NA),
     plot.margin        = margin(15, 15, 10, 10)) +
-  scale_x_continuous(breaks = seq(-0.5, 2.5, by = 0.5)) +
-  coord_cartesian(xlim = c(-0.5, 2.5))
+  scale_x_continuous(breaks = seq(0, 2.5, by = 0.5)) +
+  coord_cartesian(xlim = c(-0.05, 2.5))
 if (exists("dens")) {
   PDF.plot <- PDF.plot +
     geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
@@ -328,12 +365,27 @@ if (exists("dens")) {
              label = paste0("Upper 5th percentile:\n ", round(x1, 2), " < X < ", round(x2, 2)),
              size = 4, fontface = "bold") 
 }
-#call the plot
+#call and assign the plot
 print(PDF.plot)
+
+#get legend for later
+legend <- get_legend(PDF.plot)
+
+#remove legend from plot panels 
+PDF.plot <- PDF.plot + theme(legend.position = "none")
+assign(paste0(gsub("-", "_", args[3]), "_PDF.plot"), PDF.plot)
+
+#run after all three panels have been assigned above
+stacked <- plot_grid(ccg_PDF.plot, ccg_res_PDF.plot, ccg_ntill_PDF.plot, ncol = 1, align = "v")
+#stacked <- plot_grid(ccg_res_PDF.plot, ntill_res_PDF.plot, ncol = 1, align = "v")
+#stacked <- plot_grid(ccg_PDF.plot, ntill_PDF.plot, ccg_res_PDF.plot, ccg_ntill_PDF.plot, ncol = 2)
+#final_plot <- plot_grid(stacked, legend, ncol = 1, rel_heights = c(1, 0.2))
+final_plot <- plot_grid(stacked, legend, ncol = 2, rel_widths = c(1, 0.2))
+print(final_plot)
 
 ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
              "/regional_PDF_", args[6], "_", args[3], "_", args[4], ".png"),
-      width = 8.5, height = 5, units = "in", dpi = 300)
+      width = 8.5, height = 11, units = "in", dpi = 300)
 #-------------------------------------------------------------------------------
 # Singular CDF: Cumulative Density Function
 #-------------------------------------------------------------------------------
