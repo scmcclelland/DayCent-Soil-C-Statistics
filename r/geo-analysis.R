@@ -196,7 +196,7 @@ dt_means <- dt_scenario[, .(
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "USA"
+args[6] <- "Global"
 
 #filter to correct region
 dt_filtered <- dt_scenario[region == args[6], ]
@@ -377,6 +377,7 @@ assign(paste0(gsub("-", "_", args[3]), "_PDF.plot"), PDF.plot)
 
 #run after all three panels have been assigned above
 stacked <- plot_grid(ccg_PDF.plot, ccg_res_PDF.plot, ccg_ntill_PDF.plot, ncol = 1, align = "v")
+#stacked <- plot_grid(ccg_res_PDF.plot, ntill_res_PDF.plot, ncol = 1, align = "v")
 final_plot <- plot_grid(stacked, legend, ncol = 2, rel_widths = c(1, 0.2))
 print(final_plot)
 
