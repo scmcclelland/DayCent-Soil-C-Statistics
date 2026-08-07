@@ -378,6 +378,8 @@ assign(paste0(gsub("-", "_", args[3]), "_PDF.plot"), PDF.plot)
 #run after all three panels have been assigned above
 stacked <- plot_grid(ccg_PDF.plot, ccg_res_PDF.plot, ccg_ntill_PDF.plot, ncol = 1, align = "v")
 #stacked <- plot_grid(ccg_res_PDF.plot, ntill_res_PDF.plot, ncol = 1, align = "v")
+#stacked <- plot_grid(ccg_PDF.plot, ntill_PDF.plot, ccg_res_PDF.plot, ccg_ntill_PDF.plot, ncol = 2)
+#final_plot <- plot_grid(stacked, legend, ncol = 1, rel_heights = c(1, 0.2))
 final_plot <- plot_grid(stacked, legend, ncol = 2, rel_widths = c(1, 0.2))
 print(final_plot)
 
