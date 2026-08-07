@@ -196,7 +196,7 @@ dt_means <- dt_scenario[, .(
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
-args[6] <- "Global"
+args[6] <- "USA"
 
 #filter to correct region
 dt_filtered <- dt_scenario[region == args[6], ]
@@ -233,7 +233,7 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
   scale_x_continuous(
     breaks = seq(0, 2, by = 0.5)) +
   coord_cartesian(xlim = c(0,2), clip = "off") +
-  labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Change Over" ~ .(yrs) ~ "Years"),
+  labs(x = bquote("SOC Change"~"Mg ha"^-1~"y"^-1),
        y = NULL,
        title = "Distribution of Summary Statistics",
        subtitle = paste0(args[6], " | ", "Scenario - ", scenario_labels[args[3]]),
