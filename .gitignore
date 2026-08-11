@@ -50,6 +50,7 @@ rsconnect/
 
 # Directories
 test-data/
+output/
 
 # Other
 .DS_Store
