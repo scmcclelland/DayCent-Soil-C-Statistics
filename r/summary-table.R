@@ -68,7 +68,7 @@ region_dt <- rbindlist(
 # this loop loads-in data for desired scenarios and appends world bank names and regions
 # for later filtration. Note: resultant tables contain duplicate rows and must be filtered
 # by region.
-table_scenarios <- c("ccg", "ccg-res", "ccg-ntill")
+table_scenarios <- c("ccg", "res", "ntill", "ccg-res", "ntill-res", "ccg-ntill")
 for (s in table_scenarios) {
   #load in as dt_scenario
   load(paste0(b_path, "/", args[1], "/",      #base file path
@@ -112,7 +112,7 @@ sum_table <- data.table()
 sum_table <- rbindlist(lapply(table_scenarios, function(s) {
   dt <- get(paste0("dt_means_", gsub("-", "_", s)))
   dt[, .(
-    Mean  = round(mean(Mean), 3),
+    Mean  = round(mean(Mean), 2),
     Lower = round(quantile(Mean, 0.025), 3),
     Upper = round(quantile(Mean, 0.975), 3)
   ), by = region][, scenario := scenario_labels[s]]
