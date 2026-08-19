@@ -7,5 +7,47 @@ updated: "19 August 2026"
 ---
 # README: A data & script introduction for DBC data visualization
 
-### Overview
+## Overview
 This document provides an overview of the required packages, order of operations, and inter-script dependencies for the 2026 Woodwell Climate Lab X McClelland Lab collaboration, *Are soil carbon credits truly conservative?*. Treat this document as a README and guide to the data visualization and statistics associated with the DayCent pillar of this project.
+
+## Project Space
+Within the **DayCent-Soil-C-Statistics** project space, there are three main directories of interest: 
+1) data - Contains directories and files for both input and output data. For our purposes, DayCent simulations SOC data comes from a subdirectory "analysis-input" and visualizations, tables, and statistical output is stored in a subdirectory "analysis-output".
+2) md - **You are here.** This directory contains markdown documents which guide users in the creation or reproduction of statistical analysis.
+3) r - All R scripts discussed in this document are within this directory.
+
+## Required Packages 
+All scripts within the **DayCent-Soil-C-Statistics** project space include required packages at the beginning of the script, often under a heading "**Libraries**". Below is a comprehensive list of packages used in the project space and a brief explanation of their use.
+```{r, message=F}
+# NOTE that install.package() is not always required on HPC clusters and can cause errors if run.
+# Check with your HPC admins to know if packages come pre-installed. (not required on Seawulf. Packages are pre-installed)
+
+library(cowplot)    # Used for extracting legend text from existing plots and for faceting/paneling large plots.
+library(data.table) # Primary data manipulation, wrangling, and tidying tool. Efficient for large data.
+library(ggplot2)    # Primary data visualization, plotting, and aesthetic tool.
+library(ggridges)   # Used in conjunction with ggplot2 to create "ridgeline" plots, which show binned continuous SOC data as density curves.
+library(rstudioapi) # Allows for different users to interact with Rstudio programmatically. Often used to set working directories.
+library(sf)         # Used to import, transform and re-project shapefiles (vector) for World Bank administrative boundaries.
+library(stringr)    # String manipulation tools. Often str_split().
+library(terra)      # Reading in raster data for cropland mask. Rasterizing vector data objects.
+
+```
+
+## Script Explanations and order of Operations
+### DBC Scripts
+#### histograms.R
+**Standalone:** Requires no other script to run.
+
+**Outputs:** 
+
+  - Ridgeline plots of model variability for annual dSOC (single scenario), at: MIN, P25, MEDIAN, MEAN, P75, MAX. 
+  - Probability Density Function plots of simulated annual dSOC (single scenario) with optional shading between two chosen thresholds for X.
+  - Cumulative Density Function plots of simulated annual dSOC (single scenario). Clean, no annotations.
+  - Shared X-axis Histograms of model variability for *mean or median* annual dSOC (multiple scenarios), number of scenarios = number of colored histograms sharing X-axis. 
+  - Exportable table (.csv) of summary statistics by scenario and timescale.
+
+#### covariate-analysis.R
+
+
+
+### SCM Scripts
