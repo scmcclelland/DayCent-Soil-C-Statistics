@@ -1,0 +1,11 @@
+---
+title: "dependencies"
+output: html_document
+author: "Docker B. Clark"
+created: "19 August 2026"
+updated: "19 August 2026"
+---
+# README: A data & script introduction for DBC data visualization
+
+### Overview
+This document provides an overview of the required packages, order of operations, and inter-script dependencies for the 2026 Woodwell Climate Lab X McClelland Lab collaboration, *Are soil carbon credits truly conservative?*. Treat this document as a README and guide to the data visualization and statistics associated with the DayCent pillar of this project.
