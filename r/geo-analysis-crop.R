@@ -169,6 +169,14 @@ regions <- list(
 #-------------------------------------------------------------------------------
 # Filter to desired regions
 #-------------------------------------------------------------------------------
+# create and append regional lookup table
+region_dt <- rbindlist(
+  lapply(names(regions), function(r) data.table(region = r, WB_NAME = regions[[r]])))
+
+#allow.cartesian allows for rows to be added when a WB_NAME belongs two region groups
+# ex. France now has duplicate rows labeled "Global" and "European Union"
+dt_scenario <- merge(dt_scenario, region_dt, by = "WB_NAME", allow.cartesian = TRUE)
+
 # reset args[6] if desired
 args[6] <- "Global"
 
