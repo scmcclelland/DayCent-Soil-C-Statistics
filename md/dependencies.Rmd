@@ -3,7 +3,7 @@ title: "dependencies"
 output: html_document
 author: "Docker B. Clark"
 created: "19 August 2026"
-updated: "19 August 2026"
+updated: "20 August 2026"
 ---
 # README: A data & script introduction for DBC data visualization
 
@@ -38,8 +38,7 @@ library(terra)      # Reading in raster data for cropland mask. Rasterizing vect
 #### histograms.R
 **Standalone:** Requires no other script to run.
 
-**Outputs:** 
-
+**Outputs:**  
   - Ridgeline plots of model variability for annual dSOC (single scenario), at: MIN, P25, MEDIAN, MEAN, P75, MAX. 
   - Probability Density Function plots of simulated annual dSOC (single scenario) with optional shading between two chosen thresholds for X.
   - Cumulative Density Function plots of simulated annual dSOC (single scenario). Clean, no annotations.
@@ -47,7 +46,13 @@ library(terra)      # Reading in raster data for cropland mask. Rasterizing vect
   - Exportable table (.csv) of summary statistics by scenario and timescale.
 
 #### covariate-analysis.R
+**Standalone:** Requires no other script to run.
 
+**Outputs:**  
+  - Histograms and density plots for exploratory data analysis involving possible SOC covariates.
+  - Faceted scatter plots of covariates and SOC (faceted by crop species, irrigation). Covariates analyzed include but are not limited to: total applied N, mineral N, bulk density, soil pH, soil clay content, and relative water content.
+  
+#### geo-analysis.R & geo-analysis-crop.R
 
 
 ### SCM Scripts
