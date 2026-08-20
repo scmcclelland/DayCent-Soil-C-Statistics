@@ -33,26 +33,61 @@ library(terra)      # Reading in raster data for cropland mask. Rasterizing vect
 
 ```
 
-## Script Explanations and order of Operations
+## Script Explanations and Order of Operations
 ### DBC Scripts
 #### histograms.R
 **Standalone:** Requires no other script to run.
 
 **Outputs:**  
+
   - Ridgeline plots of model variability for annual dSOC (single scenario), at: MIN, P25, MEDIAN, MEAN, P75, MAX. 
-  - Probability Density Function plots of simulated annual dSOC (single scenario) with optional shading between two chosen thresholds for X.
-  - Cumulative Density Function plots of simulated annual dSOC (single scenario). Clean, no annotations.
+  - Probability Density Function plots of simulation annual dSOC (single scenario) with optional shading between two chosen thresholds for X.
+  - Cumulative Density Function plots of simulation annual dSOC (single scenario). Clean, no annotations.
   - Shared X-axis Histograms of model variability for *mean or median* annual dSOC (multiple scenarios), number of scenarios = number of colored histograms sharing X-axis. 
   - Exportable table (.csv) of summary statistics by scenario and timescale.
 
 #### covariate-analysis.R
 **Standalone:** Requires no other script to run.
 
-**Outputs:**  
+**Outputs:**
+
   - Histograms and density plots for exploratory data analysis involving possible SOC covariates.
   - Faceted scatter plots of covariates and SOC (faceted by crop species, irrigation). Covariates analyzed include but are not limited to: total applied N, mineral N, bulk density, soil pH, soil clay content, and relative water content.
   
 #### geo-analysis.R & geo-analysis-crop.R
+**Standalone:** Requires no other script to run.d
 
+**Outputs:** 
+
+  - Both geo-analysis scripts contain code to read in and join spatial data for world bank administrative boundaries to main DayCent simulation data. Several other scripts rely on the "WB_dt" created and joined in the beginning of these scripts.
+  - Sub-global ridgeline plots of model variability for annual dSOC (single scenario).
+  - Shared X-axis histograms of model variability for *mean* annual dSOC (multiple regions, single scenario), number of regions = number of colored histograms sharing X-axis. (Also available as smoothed curves)
+  - Sub-global PDF plots of simulation annual dSOC with annotations for MEAN, MEDIAN, P75, and P90. (plots can be saved multiple times for a paneled display of several scenarios at once)
+  - Sub-global CDF plots of simulation annual dSOC (single scenario) with optional annotations at a user-specified SOC threshold (single scenario).
+  - **geo-analysis-crop** contains scripts to run the above PDF and CDF plots split by crop species (maize, soybeans, wheat). One scenario + region = three PDF or CDF plots.
+  
+#### multi-CDF-table.R
+**Standalone:** Carries a copy of the "WB_dt" creation script.
+
+**Outputs:**
+
+  - Creates or loads **dt_plot**, a *long format* table of global annual dSOC data for multiple scenarios: ccg, res, ntill, ccg-res, ntill-res, ccg-ntill.
+  - Contains code to auto detect modifications in input data and recreate table accordingly.
+  
+#### multi-cdf.R & multi-cdf-crop.R
+**Dependencies:** Requires **dt_plot** created by "multi-CDF-table.R" script to exist in output directory.
+
+**Outputs:** 
+
+  - Multi-scenario CDF plot of simulation annual dSOC with annotations for a common threshold X (user selected). Can be global or subglobal.
+  - multi-cdf-crop.R splits each of these into three according to crop species (maize, soybeans, and wheat). One region = three multi-scenario CDF plots
+  
+#### summary-table.R
+**Dependencies:** Requires "WB_dt" created by geo-analysis.R
+
+**Outputs:**
+
+  - Loads and collects summary statistics (means) across multiple DayCent scenarios (user specfied): ccg, res, ntill, ccg-res, ntill-res, ccg-ntill. Summary stats are also split by region (including global). Creates this summary table as a data.table object "sum_table" which can be viewed in R and exports this table as "Regional_means_table.csv". 
+  
 
 ### SCM Scripts

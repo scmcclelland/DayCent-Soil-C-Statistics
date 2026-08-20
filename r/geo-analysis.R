@@ -251,9 +251,9 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
     plot.margin        = margin(15, 15, 10, 10)
   )
 
-ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
-              "/ridgeline_", args[3], "_", args[4], "_", args[6], ".png"),
-       width = 8.5, height = 5, units = "in", dpi = 300)
+#ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
+#              "/ridgeline_", args[3], "_", args[4], "_", args[6], ".png"),
+#       width = 8.5, height = 5, units = "in", dpi = 300)
 
 #-------------------------------------------------------------------------------
 # Multi-Region Histogram
