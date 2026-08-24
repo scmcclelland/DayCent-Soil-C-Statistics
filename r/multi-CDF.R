@@ -1,6 +1,6 @@
 # filename:     multi-CDF.R    
 # created:      16 July 2026
-# last updated: 16 July 2026
+# last updated: 24 August 2026
 # author:       Docker Clark
 
 # description: This script creates and/or saves a multi-scenario CDF visualization.
@@ -66,6 +66,9 @@ ecdf_ccg_res   <- ecdf(dt_plot[scenario == "ccg-res", an_d_s_SOC])
 ecdf_ntill_res <- ecdf(dt_plot[scenario == "ntill-res", an_d_s_SOC])
 ecdf_ccg_ntill <- ecdf(dt_plot[scenario == "ccg-ntill", an_d_s_SOC])
 
+#before random sampling, get the "n" across scenarios and display the min in the plot
+unique_gridids <- dt_plot[, .(n = length(unique(gridid))), by = scenario]
+
 if (args[6] == "Global") { #stratified random sampling to speed up plot render
   k <- 1000000 # k = desired number of samples for each stratum
   set.seed(07162026)
@@ -130,6 +133,7 @@ CDF.plot <- ggplot(dt_plot[scenario %in% c("ccg", "ccg-res", "ntill", "ntill-res
                         breaks = names(legend_labels), labels = legend_labels) +
   scale_alpha_manual(name = "Scenario", values = cdf_alpha,
                      breaks = names(legend_labels), labels = legend_labels) +
+  
   #trace out important percentiles
   geom_hline(yintercept = c(0.05, 0.5, 0.95),
              linetype = "dotted", color = "gray50", alpha = 0.6) +
@@ -156,11 +160,11 @@ CDF.plot <- ggplot(dt_plot[scenario %in% c("ccg", "ccg-res", "ntill", "ntill-res
   scale_x_continuous(breaks = seq(-0.5, 2.5, by = 0.5)) +
   coord_cartesian(xlim = c(-0.25, 2.5)) +
   annotate("text", x = 2.5, y = 0.95, label = 
-             paste("n =", format(length(unique(dt_plot$gridid)), big.mark = ",")),
+             paste("n =", format(min(unique_gridids[ , n]), big.mark = ",")),
            hjust = 1, size = 3.5, fontface = "bold") 
   
 print(CDF.plot)
 
 #ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
 #              "/multi-CDF_", gsub(" ", "_", args[6]), "_", args[4], ".png"),
-#       width = 8.5, height = 5, units = "in", dpi = 300)#
+#       width = 8.5, height = 5, units = "in", dpi = 300)
