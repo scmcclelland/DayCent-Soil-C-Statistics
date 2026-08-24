@@ -3,7 +3,7 @@ title: "dependencies"
 output: html_document
 author: "Docker B. Clark"
 created: "19 August 2026"
-updated: "20 August 2026"
+updated: "24 August 2026"
 ---
 # README: A data & script introduction for DBC data visualization
 
@@ -34,9 +34,72 @@ library(terra)      # Reading in raster data for cropland mask. Rasterizing vect
 ```
 
 ## Script Explanations and Order of Operations
+### SCM Scripts
+#### process-output.R
+**Standalone:** Requires functions from r/functions/process-output-functions.R.
+
+**Outputs:**
+
+  - Unzips raw .tar.gz DayCent output for a given run batch/scenario, filters rows by simulation year with awk before reading into R.
+  - Reshapes to a clean SOC table with run-year counts by gridid, crop, scenario, irr, ssp, gcm via process_SOC().
+  - Appends results as historical-[scenario]-SOC-results.csv.
+
+#### process-output-hi.R
+**Standalone:** Requires functions r/functions/process-output-functions.R.
+
+**Outputs:**
+
+  - Same unzip/filter process as process-output.R, but extracts harvest index (hi), grain carbon (cgrain), and (for cover crop scenarios) cover crop aboveground biomass (agcacc) via process_HI().
+  - Appends results as historical-[scenario]-HI-results.csv.
+
+#### uncertainty-somsc-script.R
+**Dependencies:** Requires historical-[scenario]-SOC-results.csv created by process-output.R. Also sources data/LME-data/SimBetas_func.R and reads LME estimate tables (SOC_Beta.csv, SOC_Cov.csv).
+
+**Outputs:**
+
+  - Simulates 1001 sets of betas from a linear mixed-effects model's fitted coefficients and covariance matrix to represent parameter uncertainty.
+  - For each gridid in the selected crop/irrigation, runs a Monte Carlo simulation applying simulated betas to log-transformed SOC, producing 1001 uncertainty-adjusted SOC replicates per year.
+  - Calculates annual and cumulative delta SOC per replicate, then exports cumulative dSOC at 10-year (2026) and 20-year (2036) horizons.
+  
+#### combine-uncertainty-output.R
+**Dependencies:** Requires the per-gridid uncertainty .csv files created by uncertainty-somsc-script.R, located in data/uncertainty-output/[timeframe].
+
+**Outputs:**
+
+  - Loads and row-binds all per-gridid uncertainty csv files matching the selected scenario/timeframe.
+  - Saves the combined table as a single .RData file (dt_somsc) at data/uncertainty-output/[timeframe]/merged/[scenario]-somsc.RData.
+  
+#### estimate-delta-SOC-uncertainty.R
+**Dependencies:** Requires the merged .RData files created by combine-uncertainty-output.R for both the target scenario and "conv" (in data/uncertainty-output/[timeframe]/merged).
+
+**Outputs:**
+
+  - Converts merged cumulative SOC (s_somsc, g C m-2) to Mg C ha-1 for both the scenario and conv.
+  - Joins scenario and conv tables by gridid, crop, irr, ssp, gcm, time, and replicate, and calculates delta SOC (scenario - conv) with uncertainty.
+  - Saves as delta-cumulative-SOC-[scenario].RData (dt_scenario) - upstream input for most **DBC Scripts**
+
+#### estimate-aboveground-npp.R
+**Dependencies:** Requires historical-[scenario]-HI-results.csv created by process-output-hi.R and input_table_by_gridid_crop_irr.RData.
+
+**Outputs:**
+
+  - Cleans the harvest index table to a consistent 20 simulation years (2017–2036) and drops zero-grain-carbon cases; for cover crop scenarios, separately extracts and rejoins cover crop aboveground biomass.
+  - Estimates aboveground live carbon, aboveground residue carbon, and (for conv only) the residue fraction removed based on residue retention rate.
+  - Calculates percent of aboveground NPP removed by gridid/crop/irrigation.
+  - Saves as estimated-abg-NPP-removed-[scenario].csv.
+
+#### raster-aboveground-npp.R
+**Dependencies:** Requires estimated-abg-NPP-removed-[scenario].csv created by estimate-aboveground-npp.R and the cropland mask raster msw-cropland-rf-ir-area.tif.
+
+**Outputs:**
+
+  - Rasterizes percent aboveground NPP removed by gridid.
+  - Builds a binary cropland-presence layer (cropland_binary) from the crop mask (where 1 = crop present, 0 = valid but no crops, NA = no data).
+  - Saves both layers as a multi-band .tif: abovegroundNPP-percent-removed-[scenario].tif.
+
 ### DBC Scripts
 #### histograms.R
-**Standalone:** Requires no other script to run.
+**Dependencies:** Requires delta-cumulative-SOC-[scenario].RData (dt_scenario) from estimate-delta-SOC-uncertainty.R.
 
 **Outputs:**  
 
@@ -47,7 +110,7 @@ library(terra)      # Reading in raster data for cropland mask. Rasterizing vect
   - Exportable table (.csv) of summary statistics by scenario and timescale.
 
 #### covariate-analysis.R
-**Standalone:** Requires no other script to run.
+**Dependencies:** Requires delta-cumulative-SOC-[scenario].RData (dt_scenario) from estimate-delta-SOC-uncertainty.R.
 
 **Outputs:**
 
@@ -55,7 +118,7 @@ library(terra)      # Reading in raster data for cropland mask. Rasterizing vect
   - Faceted scatter plots of covariates and SOC (faceted by crop species, irrigation). Covariates analyzed include but are not limited to: total applied N, mineral N, bulk density, soil pH, soil clay content, and relative water content.
   
 #### geo-analysis.R & geo-analysis-crop.R
-**Standalone:** Requires no other script to run.d
+**Dependencies:** Requires delta-cumulative-SOC-[scenario].RData (dt_scenario) from estimate-delta-SOC-uncertainty.R.
 
 **Outputs:** 
 
@@ -67,7 +130,7 @@ library(terra)      # Reading in raster data for cropland mask. Rasterizing vect
   - **geo-analysis-crop** contains scripts to run the above PDF and CDF plots split by crop species (maize, soybeans, wheat). One scenario + region = three PDF or CDF plots.
   
 #### multi-CDF-table.R
-**Standalone:** Carries a copy of the "WB_dt" creation script.
+**Dependencies:** Requires delta-cumulative-SOC-[scenario].RData (dt_scenario) from estimate-delta-SOC-uncertainty.R. Carries a copy of the "WB_dt" creation script.
 
 **Outputs:**
 
@@ -83,11 +146,8 @@ library(terra)      # Reading in raster data for cropland mask. Rasterizing vect
   - multi-cdf-crop.R splits each of these into three according to crop species (maize, soybeans, and wheat). One region = three multi-scenario CDF plots
   
 #### summary-table.R
-**Dependencies:** Requires "WB_dt" created by geo-analysis.R
+**Dependencies:** Requires delta-cumulative-SOC-[scenario].RData (dt_scenario) from estimate-delta-SOC-uncertainty.R. Requires "WB_dt" created by geo-analysis.R
 
 **Outputs:**
 
   - Loads and collects summary statistics (means) across multiple DayCent scenarios (user specfied): ccg, res, ntill, ccg-res, ntill-res, ccg-ntill. Summary stats are also split by region (including global). Creates this summary table as a data.table object "sum_table" which can be viewed in R and exports this table as "Regional_means_table.csv". 
-  
-
-### SCM Scripts
