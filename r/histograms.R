@@ -29,6 +29,14 @@ args[6] <- "delta-cumulative-SOC"
 if (isFALSE(length(args) == 6)) stop( 'Needs 6 command-line argument (scenario selection, timeframe, data path,
                                       input/output, data file header).' )
 
+args    <- commandArgs(trailingOnly = TRUE) 
+args[1] <- "analysis-input"
+args[2] <- "analysis-output"
+args[3] <- "ccg"
+args[4] <- "20-yr"
+args[5] <- "delta-cumulative-SOC"
+
+
 #get current directory (dir)
 dir = dirname(getActiveDocumentContext()$path) 
 dir = str_split(dir, '/r') 
@@ -36,23 +44,27 @@ dir = dir[[1]][1]
 setwd(dir) # set as working directory
 
 #set input data directory
-d_dir <- paste(args[3], args[4], args[2], sep = '/')
+in_dir <- paste(dir, args[1], sep = '/')
 #set output data directory
-o_dir <- paste(args[3], args[5], args[2], sep = '/')
+o_dir <- paste(dir, args[2], sep = '/')
 
 #-------------------------------------------------------------------------------
 # read in data
 #-------------------------------------------------------------------------------
 
-load(paste0(args[3], "/", args[4], "/",     #base file path
-            args[2], "/", args[6], "-",     #time scale & SOC delta
-            args[1],".RData"))              #scenario code
+load(paste0(in_dir, "/", args[4], "/",       #base file path & time scale
+            args[5], "-", args[3],".RData")) #SOC delta & scenario code
+
+#for DBC
+load(paste0("/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data/analysis-input/",      #base file path
+            args[4], "/", args[5], "-",     #time scale & SOC delta
+            args[3],".RData"))              #scenario code and extension
 
 #-------------------------------------------------------------------------------
 # data manipulation
 #-------------------------------------------------------------------------------
 #annualize SOC 
-yrs <- as.numeric(str_split(args[2], "-")[[1]][1])
+yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
 dt_scenario[, d_s_SOC := d_s_SOC / yrs]
 
 dt_stats <- dt_scenario[, .(
@@ -82,8 +94,8 @@ if (!exists("dt_scenario_meds")) {
 }
 
 #pull out desired summary stats
-dt_scenario_means[, (args[1]) := dt_stats$Mean]
-dt_scenario_meds[, (args[1]) := dt_stats$Median]
+dt_scenario_means[, (args[3]) := dt_stats$Mean]
+dt_scenario_meds[, (args[3]) := dt_stats$Median]
 
 #melt to long form for ggplot once enough scenarios in dt
 dt_means_long <- melt(dt_scenario_means, 
@@ -120,7 +132,8 @@ scenario_labels <- c(
 #-------------------------------------------------------------------------------
 # ridgeline plot (summary stats)
 #-------------------------------------------------------------------------------
-ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
+ridgeline.plot <- ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
+  
   geom_density_ridges(alpha = 0.6, rel_min_height = 0.01,
                       color = "gray20", linewidth = 0.4,
                       bandwidth = 0.035) + #binwidth for smoothing
@@ -131,7 +144,7 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
   labs(x = bquote("Mg ha"^-1~"y"^-1~"SOC Change Over" ~ .(yrs) ~ "Years"),
        y = NULL,
        title = "Distribution of Summary Statistics",
-       subtitle = paste0("Scenario - ", scenario_labels[args[1]]),
+       subtitle = paste0("Scenario - ", scenario_labels[args[3]]),
        caption = "Variation from 1,001 Monte Carlo draws") +
   theme_ridges(font_family = "sans") +
   theme(
@@ -145,16 +158,19 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
     plot.background    = element_rect(fill = "white", color = NA),
     plot.margin        = margin(15, 15, 10, 10)
   )
+#call plot
+ridgeline.plot
 
 #create a filename to save this plot as
-#fname_ridgeline <- paste("Ridgeline", args[2], args[1], sep = "_")
+fname_ridgeline <- paste("ridgeline", args[3], sep = "-")
 #save to output directory
-#ggsave(filename = paste0(o_dir, "/", fname_ridgeline, ".tiff"),
-#       units    = "in",
-#       width    = 7,
-#       height   = 5,
-#       dpi      = 300,
-#       bg       = "white")
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_ridgeline, ".tiff"),
+       plot = ridgeline.plot,
+       units    = "in",
+       width    = 7,
+       height   = 5,
+       dpi      = 300,
+       bg       = "white")
 
 #-------------------------------------------------------------------------------
 # PDF: Probability Density Function
@@ -174,7 +190,7 @@ PDF.plot <- ggplot(dt_scenario, aes(x = d_s_SOC)) +
                alpha = 0.6, linewidth = 0.8,
                adjust = 2) +
   labs(title = "PDF: Soil Carbon Change Distribution",
-       subtitle = paste("Scenario:", scenario_labels[args[1]], "| Timescale:", yrs, "Years"),
+       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
        x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
        y = "Probability Density") +
   theme_minimal(base_size = 13) +
@@ -200,25 +216,27 @@ if (exists("dens")) {
 PDF.plot
 
 #create a filename for saving
-#fname_PDF <- paste("Prob_Dens", args[2], args[1], sep = "_")
+fname_PDF <- paste("PDF-single", args[3], sep = "-")
 #save to output directory
-#ggsave(filename = paste0(o_dir, "/", fname_PDF, ".tiff"),
-#       units    = "in",
-#       width    = 7,
-#       height   = 5,
-#       dpi      = 300,
-#       bg       = "white")
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_PDF, ".tiff"),
+       plot     = PDF.plot,
+       units    = "in",
+       width    = 7,
+       height   = 5,
+       dpi      = 300, #digital resolution
+       bg       = "white")
 
 #-------------------------------------------------------------------------------
 # CDF: Cumulative Density Function
 #-------------------------------------------------------------------------------
-ggplot(dt_scenario, aes(x = d_s_SOC)) +
+CDF.plot <- ggplot(dt_scenario, aes(x = d_s_SOC)) +
+  
   stat_ecdf(geom = "step", linewidth = 1.2, color = "#2d6e56") +
   geom_hline(yintercept = c(0.05, 0.5, 0.95),
              linetype = "dotted", color = "gray50", alpha = 0.6) +
   scale_y_continuous(labels = scales::percent_format()) +
   labs(title = "CDF: Soil Carbon Change Distribution",
-       subtitle = paste("Scenario:", scenario_labels[args[1]], "| Timescale:", yrs, "Years"),
+       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
        x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
        y = "Cumulative Probability") +
   theme_bw() +
@@ -230,22 +248,27 @@ ggplot(dt_scenario, aes(x = d_s_SOC)) +
     plot.background = element_rect(fill = "white", color = NA),
     plot.margin     = margin(15, 15, 10, 10)
   )
+#call plot
+CDF.plot
+
 #file name for saving
-#fname_CDF <- paste("Cumul_Dens", args[2], args[1], sep = "_")
+fname_CDF <- paste("CDF-single", args[3], sep = "-")
 #save to output directory
-#ggsave(filename = paste0(o_dir, "/", fname_CDF, ".tiff"),
-#       units    = "in",
-#       width    = 7,
-#       height   = 5,
-#       dpi      = 300,
-#       bg       = "white")
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_CDF, ".tiff"),
+       path     = CDF.plot,
+       units    = "in",
+       width    = 7,
+       height   = 5,
+       dpi      = 300,
+       bg       = "white")
 
 #-------------------------------------------------------------------------------
-#Histograms
+#Histograms (run after populating multiple columns in dt_scenario_means)
 #-------------------------------------------------------------------------------
 fillcols <- cat_cols[1:ncol(dt_scenario_means)]
 #shared-axis hist of different scenario MEANS
-ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
+means.hist.plot <- ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
+  
   geom_histogram(alpha = 0.5, bins = 150, position = "identity") +
   scale_fill_manual(values = fillcols, labels = scenario_labels) +
   labs(x = expression("Mean SOC Change (Mg ha"^-1~"yr"^-1*")"),
@@ -255,21 +278,23 @@ ggplot(dt_means_long, aes(x = mean_SOC, fill = scenario)) +
   theme_classic() +
   theme(legend.position = c(0.65, 0.75),
         legend.background = element_rect(fill = "white", color = "grey90"))
+#call plot
+means.hist.plot
 
 #file name for saving
-#fname_mean_hist <- paste("Scenario_hist", args[2], 
-#                         paste(colnames(dt_scenario_means), collapse = "_"), 
-#                         sep = "_")
+fname_mean_hist <- "histogram-multi-scenario-means"
 #save to output directory
-#ggsave(filename = paste0(o_dir, "/", fname_mean_hist, ".tiff"),
-#       units    = "in",
-#       width    = 7,
-#       height   = 5,
-#       dpi      = 300,
-#       bg       = "white")
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_mean_hist, ".tiff"),
+       plot     = means.hist.plot,
+       units    = "in",
+       width    = 7,
+       height   = 5,
+       dpi      = 300,
+       bg       = "white")
 
 #shared-axis hist of different scenario MEDIANS
-ggplot(dt_meds_long, aes(x = med_SOC, fill = scenario)) +
+meds.hist.plot <- ggplot(dt_meds_long, aes(x = med_SOC, fill = scenario)) +
+  
   geom_histogram(alpha = 0.5, bins = 150, position = "identity") +
   scale_fill_manual(values = fillcols, labels = scenario_labels) +
   labs(x = expression("Median SOC Change (Mg ha"^-1~"yr"^-1*")"),
@@ -279,20 +304,22 @@ ggplot(dt_meds_long, aes(x = med_SOC, fill = scenario)) +
   theme_classic() +
   theme(legend.position = c(0.65, 0.75),
         legend.background = element_rect(fill = "white", color = "grey90"))
+#call plot
+meds.hist.plot
+
 #file name for saving
-#fname_med_hist <- paste("Scenario_hist", args[2], 
-#                         paste(colnames(dt_scenario_meds), collapse = "_"), 
-#                         sep = "_")
+fname_med_hist <- "histogram-multi-scenario-medians"
 #save to output directory
-#ggsave(filename = paste0(o_dir, "/", fname_med_hist, ".tiff"),
-#       units    = "in",
-#       width    = 7,
-#       height   = 5,
-#       dpi      = 300,
-#       bg       = "white")
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_med_hist, ".tiff"),
+       plot     = meds.hist.plot,
+       units    = "in",
+       width    = 7,
+       height   = 5,
+       dpi      = 300,
+       bg       = "white")
 
 #-------------------------------------------------------------------------------
-# Output
+# Output #TODO start here
 #-------------------------------------------------------------------------------
 #save the stats from each scenario to the output directory
 fwrite(x    = dt_stats,
