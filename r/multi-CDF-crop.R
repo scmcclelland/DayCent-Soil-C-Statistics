@@ -1,6 +1,6 @@
 # filename:     multi-CDF-crop.R    
 # created:      26 June 2026
-# last updated: 22 July 2026
+# last updated: 28 August 2026
 # author:       Docker Clark
 
 # description: This script performs two main functions:
@@ -21,21 +21,29 @@ library(rstudioapi)
 #-------------------------------------------------------------------------------
 # directories and startup
 #-------------------------------------------------------------------------------
-#dir = dirname(getActiveDocumentContext()$path)
-#dir = str_split(dir, '/r')
-#dir = dir[[1]][1]
-#setwd(dir)
+dir = dirname(getActiveDocumentContext()$path)
+dir = str_split(dir, '/r')
+dir = dir[[1]][1]
+setwd(dir)
 
-#base path
-b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data"
-
-args    <- commandArgs(trailingOnly = TRUE) 
-args[1] <- "analysis-input"
-args[2] <- "analysis-output"
-args[3] <- "ccg-ntill"
+#command line args 
+args     = commandArgs(trailingOnly = TRUE) 
+#these can be updated for different scenarios
+args[1] <- "data/analysis-input"
+args[2] <- "data/analysis-output"
+args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
 args[6] <- "Global"
+
+#check if there's enough info to get a filepath
+if (isFALSE(length(args) == 6)) stop( 'Needs 6 command-line argument (scenario selection, timeframe, data path,
+                                      input/output, data file header).' )
+
+#set input data directory
+in_dir <- paste(dir, args[1], sep = '/')
+#set output data directory
+o_dir <- paste(dir, args[2], sep = '/')
 
 #for later labeling
 scenario_labels <- c(
@@ -47,7 +55,7 @@ scenario_labels <- c(
   "ntill-res" = "No-Tillage & Full Residue Retention",
   "ccg-res"   = "Grass Cover Crop & Full Residue Retention",
   "ccl-res"   = "Legume Cover Crop & Full Residue Retention",
-  "ccg-ntill" = "Grass Cover Crop, No-Tillage & Full Residue Retention",
+  "ccg-ntill" = "Grass CC, No-Till & Full Residue Retention",
   "ccl-ntill" = "Legume Cover Crop, No-Tillage & Full Residue Retention")
 
 #-------------------------------------------------------------------------------
@@ -57,11 +65,9 @@ scenario_labels <- c(
 args[6] <- "Oceania"
 args[4] <- "20-yr"
 yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
-#set output path for tables and viz
-o_path <- paste(b_path, args[2], args[4], sep = "/")
 
 #load in table according to region (args[6]) and time scale (args[4]) 
-dt_crops <- fread(paste0(o_path, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], ".csv"))
+dt_crops <- fread(paste0(o_dir, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], ".csv"))
 
 #split by crop
 dt_corn <- dt_crops[crop == "maiz", ]
@@ -179,7 +185,21 @@ for (crop in c("corn", "soyb", "wheat")) {
   
   print(CDF.plot)
   
-  #ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
-  #              "/multi-CDF_", gsub(" ", "_", args[6]), "_", args[4], ".png"),
-  #       width = 8.5, height = 5, units = "in", dpi = 300)
+  #assign plot
+  assign(paste0("CDF.", crop), CDF.plot)
+  #assign name
+  assign(paste0("fname_cdf_", crop), paste0("cdf-multi-scenario-", args[6], "-", crop))
 }
+
+# a loop to save all crop-wise plots
+for (crop in c("corn", "soyb", "wheat")) {
+  ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", 
+                           get(paste0("fname_cdf_", crop)), ".png"),
+         plot     = get(paste0("CDF.", crop)),
+         units    = "in",
+         width    = 8.5,
+         height   = 5,
+         dpi      = 300, #digital resolution
+         bg       = "white")
+}
+

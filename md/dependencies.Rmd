@@ -1,0 +1,153 @@
+---
+title: "dependencies"
+output: html_document
+author: "Docker B. Clark"
+created: "19 August 2026"
+updated: "24 August 2026"
+---
+# README: A data & script introduction for DBC data visualization
+
+## Overview
+This document provides an overview of the required packages, order of operations, and inter-script dependencies for the 2026 Woodwell Climate Lab X McClelland Lab collaboration, *Are soil carbon credits truly conservative?*. Treat this document as a README and guide to the data visualization and statistics associated with the DayCent pillar of this project.
+
+## Project Space
+Within the **DayCent-Soil-C-Statistics** project space, there are three main directories of interest: 
+1) data - Contains directories and files for both input and output data. For our purposes, DayCent simulations SOC data comes from a subdirectory "analysis-input" and visualizations, tables, and statistical output is stored in a subdirectory "analysis-output".
+2) md - **You are here.** This directory contains markdown documents which guide users in the creation or reproduction of statistical analysis.
+3) r - All R scripts discussed in this document are within this directory.
+
+## Required Packages 
+All scripts within the **DayCent-Soil-C-Statistics** project space include required packages at the beginning of the script, often under a heading "**Libraries**". Below is a comprehensive list of packages used in the project space and a brief explanation of their use.
+```{r, message=F}
+# NOTE that install.package() is not always required on HPC clusters and can cause errors if run.
+# Check with your HPC admins to know if packages come pre-installed. (not required on Seawulf. Packages are pre-installed)
+
+library(cowplot)    # Used for extracting legend text from existing plots and for faceting/paneling large plots.
+library(data.table) # Primary data manipulation, wrangling, and tidying tool. Efficient for large data.
+library(ggplot2)    # Primary data visualization, plotting, and aesthetic tool.
+library(ggridges)   # Used in conjunction with ggplot2 to create "ridgeline" plots, which show binned continuous SOC data as density curves.
+library(rstudioapi) # Allows for different users to interact with Rstudio programmatically. Often used to set working directories.
+library(sf)         # Used to import, transform and re-project shapefiles (vector) for World Bank administrative boundaries.
+library(stringr)    # String manipulation tools. Often str_split().
+library(terra)      # Reading in raster data for cropland mask. Rasterizing vector data objects.
+
+```
+
+## Script Explanations and Order of Operations
+### SCM Scripts
+#### process-output.R
+**Standalone:** Requires functions from r/functions/process-output-functions.R.
+
+**Outputs:**
+
+  - Unzips raw .tar.gz DayCent output for a given run batch/scenario, filters rows by simulation year with awk before reading into R.
+  - Reshapes to a clean SOC table with run-year counts by gridid, crop, scenario, irr, ssp, gcm via process_SOC().
+  - Appends results as historical-[scenario]-SOC-results.csv.
+
+#### process-output-hi.R
+**Standalone:** Requires functions r/functions/process-output-functions.R.
+
+**Outputs:**
+
+  - Same unzip/filter process as process-output.R, but extracts harvest index (hi), grain carbon (cgrain), and (for cover crop scenarios) cover crop aboveground biomass (agcacc) via process_HI().
+  - Appends results as historical-[scenario]-HI-results.csv.
+
+#### uncertainty-somsc-script.R
+**Dependencies:** Requires historical-[scenario]-SOC-results.csv created by process-output.R. Also sources data/LME-data/SimBetas_func.R and reads LME estimate tables (SOC_Beta.csv, SOC_Cov.csv).
+
+**Outputs:**
+
+  - Simulates 1001 sets of betas from a linear mixed-effects model's fitted coefficients and covariance matrix to represent parameter uncertainty.
+  - For each gridid in the selected crop/irrigation, runs a Monte Carlo simulation applying simulated betas to log-transformed SOC, producing 1001 uncertainty-adjusted SOC replicates per year.
+  - Calculates annual and cumulative delta SOC per replicate, then exports cumulative dSOC at 10-year (2026) and 20-year (2036) horizons.
+  
+#### combine-uncertainty-output.R
+**Dependencies:** Requires the per-gridid uncertainty .csv files created by uncertainty-somsc-script.R, located in data/uncertainty-output/[timeframe].
+
+**Outputs:**
+
+  - Loads and row-binds all per-gridid uncertainty csv files matching the selected scenario/timeframe.
+  - Saves the combined table as a single .RData file (dt_somsc) at data/uncertainty-output/[timeframe]/merged/[scenario]-somsc.RData.
+  
+#### estimate-delta-SOC-uncertainty.R
+**Dependencies:** Requires the merged .RData files created by combine-uncertainty-output.R for both the target scenario and "conv" (in data/uncertainty-output/[timeframe]/merged).
+
+**Outputs:**
+
+  - Converts merged cumulative SOC (s_somsc, g C m-2) to Mg C ha-1 for both the scenario and conv.
+  - Joins scenario and conv tables by gridid, crop, irr, ssp, gcm, time, and replicate, and calculates delta SOC (scenario - conv) with uncertainty.
+  - Saves as delta-cumulative-SOC-[scenario].RData (dt_scenario) - upstream input for most **DBC Scripts**
+
+#### estimate-aboveground-npp.R
+**Dependencies:** Requires historical-[scenario]-HI-results.csv created by process-output-hi.R and input_table_by_gridid_crop_irr.RData.
+
+**Outputs:**
+
+  - Cleans the harvest index table to a consistent 20 simulation years (2017–2036) and drops zero-grain-carbon cases; for cover crop scenarios, separately extracts and rejoins cover crop aboveground biomass.
+  - Estimates aboveground live carbon, aboveground residue carbon, and (for conv only) the residue fraction removed based on residue retention rate.
+  - Calculates percent of aboveground NPP removed by gridid/crop/irrigation.
+  - Saves as estimated-abg-NPP-removed-[scenario].csv.
+
+#### raster-aboveground-npp.R
+**Dependencies:** Requires estimated-abg-NPP-removed-[scenario].csv created by estimate-aboveground-npp.R and the cropland mask raster msw-cropland-rf-ir-area.tif.
+
+**Outputs:**
+
+  - Rasterizes percent aboveground NPP removed by gridid.
+  - Builds a binary cropland-presence layer (cropland_binary) from the crop mask (where 1 = crop present, 0 = valid but no crops, NA = no data).
+  - Saves both layers as a multi-band .tif: abovegroundNPP-percent-removed-[scenario].tif.
+
+### DBC Scripts
+#### histograms.R
+**Dependencies:** Requires delta-cumulative-SOC-[scenario].RData (dt_scenario) from estimate-delta-SOC-uncertainty.R.
+
+**Outputs:**  
+
+  - Ridgeline plots of model variability for annual dSOC (single scenario), at: MIN, P25, MEDIAN, MEAN, P75, MAX. 
+  - Probability Density Function plots of simulation annual dSOC (single scenario) with optional shading between two chosen thresholds for X.
+  - Cumulative Density Function plots of simulation annual dSOC (single scenario). Clean, no annotations.
+  - Shared X-axis Histograms of model variability for *mean or median* annual dSOC (multiple scenarios), number of scenarios = number of colored histograms sharing X-axis. 
+  - Exportable table (.csv) of summary statistics by scenario and timescale.
+
+#### covariate-analysis.R
+**Dependencies:** Requires delta-cumulative-SOC-[scenario].RData (dt_scenario) from estimate-delta-SOC-uncertainty.R.
+
+**Outputs:**
+
+  - Histograms and density plots for exploratory data analysis involving possible SOC covariates.
+  - Faceted scatter plots of covariates and SOC (faceted by crop species, irrigation). Covariates analyzed include but are not limited to: total applied N, mineral N, bulk density, soil pH, soil clay content, and relative water content.
+  
+#### geo-analysis.R & geo-analysis-crop.R
+**Dependencies:** Requires delta-cumulative-SOC-[scenario].RData (dt_scenario) from estimate-delta-SOC-uncertainty.R.
+
+**Outputs:** 
+
+  - Both geo-analysis scripts contain code to read in and join spatial data for world bank administrative boundaries to main DayCent simulation data. Several other scripts rely on the "WB_dt" created and joined in the beginning of these scripts.
+  - Sub-global ridgeline plots of model variability for annual dSOC (single scenario).
+  - Shared X-axis histograms of model variability for *mean* annual dSOC (multiple regions, single scenario), number of regions = number of colored histograms sharing X-axis. (Also available as smoothed curves)
+  - Sub-global PDF plots of simulation annual dSOC with annotations for MEAN, MEDIAN, P75, and P90. (plots can be saved multiple times for a paneled display of several scenarios at once)
+  - Sub-global CDF plots of simulation annual dSOC (single scenario) with optional annotations at a user-specified SOC threshold (single scenario).
+  - **geo-analysis-crop** contains scripts to run the above PDF and CDF plots split by crop species (maize, soybeans, wheat). One scenario + region = three PDF or CDF plots.
+  
+#### multi-CDF-table.R
+**Dependencies:** Requires delta-cumulative-SOC-[scenario].RData (dt_scenario) from estimate-delta-SOC-uncertainty.R. Carries a copy of the "WB_dt" creation script.
+
+**Outputs:**
+
+  - Creates or loads **dt_plot**, a *long format* table of global annual dSOC data for multiple scenarios: ccg, res, ntill, ccg-res, ntill-res, ccg-ntill.
+  - Contains code to auto detect modifications in input data and recreate table accordingly.
+  
+#### multi-cdf.R & multi-cdf-crop.R
+**Dependencies:** Requires **dt_plot** created by "multi-CDF-table.R" script to exist in output directory.
+
+**Outputs:** 
+
+  - Multi-scenario CDF plot of simulation annual dSOC with annotations for a common threshold X (user selected). Can be global or subglobal.
+  - multi-cdf-crop.R splits each of these into three according to crop species (maize, soybeans, and wheat). One region = three multi-scenario CDF plots
+  
+#### summary-table.R
+**Dependencies:** Requires delta-cumulative-SOC-[scenario].RData (dt_scenario) from estimate-delta-SOC-uncertainty.R. Requires "WB_dt" created by geo-analysis.R
+
+**Outputs:**
+
+  - Loads and collects summary statistics (means) across multiple DayCent scenarios (user specfied): ccg, res, ntill, ccg-res, ntill-res, ccg-ntill. Summary stats are also split by region (including global). Creates this summary table as a data.table object "sum_table" which can be viewed in R and exports this table as "Regional_means_table.csv". 

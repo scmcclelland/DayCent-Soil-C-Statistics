@@ -1,6 +1,6 @@
-# filename:     geo-analysis-crop.R    
+# filename:     geo-analysis.R    
 # created:      20 April 2026
-# last updated: 30 July 2026
+# last updated: 28 August 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales.
@@ -16,33 +16,43 @@ library(ggplot2)
 library(ggridges)
 library(stringr)
 library(cowplot)
+library(rstudioapi)
 
 #-------------------------------------------------------------------------------
 # directories and startup
 #-------------------------------------------------------------------------------
-#dir = dirname(getActiveDocumentContext()$path)
-#dir = str_split(dir, '/r')
-#dir = dir[[1]][1]
-#setwd(dir)
+dir = dirname(getActiveDocumentContext()$path)
+dir = str_split(dir, '/r')
+dir = dir[[1]][1]
+setwd(dir)
 
-#base data path
-b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data"
-
-args    <- commandArgs(trailingOnly = TRUE) 
-args[1] <- "analysis-input"
-args[2] <- "analysis-output"
+#command line args 
+args     = commandArgs(trailingOnly = TRUE) 
+#these can be updated for different scenarios
+args[1] <- "data/analysis-input"
+args[2] <- "data/analysis-output"
 args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
 args[6] <- "Global"
 
-#assuming shp_p means shapefile path
-shp_p <- paste(b_path, args[1], "shp", sep = "/")
+#check if there's enough info to get a filepath
+if (isFALSE(length(args) == 6)) stop( 'Needs 6 command-line argument (scenario selection, timeframe, data path,
+                                      input/output, data file header).' )
 
+#set input data directory
+in_dir <- paste(dir, args[1], sep = '/')
+#set output data directory
+o_dir <- paste(dir, args[2], sep = '/')
+#shapefile path
+shp_p <- paste(in_dir, "shp", sep = "/")
+
+#-------------------------------------------------------------------------------
+# read in data
+#-------------------------------------------------------------------------------
 #add a scenario "dt_scenario"
-load(paste0(b_path, "/", args[1], "/",      #base file path
-            args[4], "/", args[5], "-",     #time scale & SOC delta
-            args[3],".RData"))              #scenario code and extension
+load(paste0(in_dir, "/", args[4], "/",       #base file path & time scale
+            args[5], "-", args[3],".RData")) #SOC delta & scenario code
 
 #annualize SOC as a new column so either can be used
 yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
@@ -66,7 +76,7 @@ scenario_labels <- c(
 # read in shape file #~/analysis-input/shp
 r_shp   <- st_read(paste(shp_p, 'WB_countries_Admin0_10m.shp', sep = '/'))
 # read in crop mask
-r       <- rast(paste(b_path, args[1], 'msw-cropland-rf-ir-area.tif', sep = '/'))
+r       <- rast(paste(in_dir, 'msw-cropland-rf-ir-area.tif', sep = '/'))
 # keep first layer terra::rasterize needs a single layer raster
 r       <- r[[1]]
 
@@ -191,30 +201,30 @@ dt_scenario <- merge(dt_scenario, region_dt, by = "WB_NAME", allow.cartesian = T
 dt_means <- dt_scenario[, .(
   Mean   = mean(an_d_s_SOC)), 
   by = .(region, rep)]
-
 #-------------------------------------------------------------------------------
 # Filter to desired regions
 #-------------------------------------------------------------------------------
 # reset args[6] if desired
 args[6] <- "Global"
 
-#filter to correct region
+#filter to correct region (necessary for all regions including global)
 dt_filtered <- dt_scenario[region == args[6], ]
 
 #-------------------------------------------------------------------------------
 # Statistics
 #-------------------------------------------------------------------------------
+
 #summary stats
 dt_stats <- dt_filtered[, .(
-#  Min = min(an_d_s_SOC),
-#  P25 = quantile(an_d_s_SOC, probs = 0.25),
+  #  Min = min(an_d_s_SOC),
+  #  P25 = quantile(an_d_s_SOC, probs = 0.25),
   Median = quantile(an_d_s_SOC, probs = 0.50),
-#  Mean = mean(an_d_s_SOC),
+  #  Mean = mean(an_d_s_SOC),
   P75 = quantile(an_d_s_SOC, probs = 0.75),
   P90 = quantile(an_d_s_SOC, probs = 0.90)
-#  Max = max(an_d_s_SOC)
-  ), 
-  by = .(rep)] 
+  #  Max = max(an_d_s_SOC)
+), 
+by = .(rep)] 
 
 #melt data to long for read-in to ggplot
 dt_long <- melt(dt_stats,
@@ -225,7 +235,7 @@ dt_long <- melt(dt_stats,
 #-------------------------------------------------------------------------------
 # Sub-Global Ridgeline plot
 #-------------------------------------------------------------------------------
-ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
+ridgeline.plot <- ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
   geom_density_ridges(alpha = 0.6, rel_min_height = 0.005,
                       color = "gray20", linewidth = 0.4,
                       bandwidth = 0.013) + #binwidth for smoothing
@@ -250,9 +260,19 @@ ggplot(dt_long, aes(x = SOC, y = statistic, fill = statistic)) +
     plot.background    = element_rect(fill = "white", color = NA),
     plot.margin        = margin(15, 15, 10, 10)
   )
-ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
-              "/ridgeline_", args[3], "_", args[4], "_", args[6], ".png"),
-       width = 8.5, height = 5, units = "in", dpi = 300)
+#call plot
+ridgeline.plot
+
+#create a filename to save this plot as
+fname_ridgeline <- paste("ridgeline", args[3], args[6], sep = "-")
+#save to output directory
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_ridgeline, ".png"),
+       plot = ridgeline.plot,
+       units    = "in",
+       width    = 8.5,
+       height   = 5,
+       dpi      = 300,
+       bg       = "white")
 
 #-------------------------------------------------------------------------------
 # Multi-Region Histogram
@@ -260,7 +280,7 @@ ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output"
 region_levels <- sort(unique(dt_means$region))
 fillcols <- setNames(cat_cols[1:length(region_levels)], region_levels)
 
-ggplot(dt_means) +
+geo.means.hist <- ggplot(dt_means) +
   geom_histogram(aes(x = Mean, fill = region), alpha = 0.5, bins = 100) +
   scale_fill_manual(values = fillcols) +
   labs(x = expression("Mean SOC Change (Mg ha"^-1~"yr"^-1*")"),
@@ -271,9 +291,13 @@ ggplot(dt_means) +
   theme_classic() +
   theme(legend.position = c(0.85, 0.75),
         legend.background = element_rect(fill = "white", color = "grey90"))
+#call plot
+geo.means.hist
+#create a filename to save this plot as
+fname_means_hist <- paste("regional-histogram-binned", args[3], sep = "-")
 
 #smoothed regional histogram
-ggplot(dt_means) +
+geo.means.smooth <- ggplot(dt_means) +
   geom_density(aes(x = Mean, fill = region, color = region), 
                alpha = 0.5, linewidth = 0.75) +
   scale_fill_manual(values = fillcols) +
@@ -288,14 +312,33 @@ ggplot(dt_means) +
   theme_classic() +
   theme(legend.position = c(0.85, 0.75),
         legend.background = element_rect(fill = "white", color = "grey90"))
+#call plot
+geo.means.smooth
+#create a filename to save this plot as
+fname_smooth <- paste("regional-histogram-smooth", args[3], sep = "-")
 
-#ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
-#              "/regional_hist_", args[3], "_", args[4], ".png"),
-#       width = 8.5, height = 5, units = "in", dpi = 300)
+#save to output directory
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_means_hist, ".png"),
+       plot = geo.means.hist,
+       units    = "in",
+       width    = 8.5,
+       height   = 5,
+       dpi      = 300,
+       bg       = "white")
+
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_smooth, ".png"),
+       plot = geo.means.smooth,
+       units    = "in",
+       width    = 8.5,
+       height   = 5,
+       dpi      = 300,
+       bg       = "white")
+
 
 #-------------------------------------------------------------------------------
 # PDF: Probability Density Function
 #-------------------------------------------------------------------------------
+#shading under curve
 #a function which allows calculation of probabilities from PDFs and CDFs
 #ecdf_fn <- ecdf(dt_filtered$an_d_s_SOC)
 ##specify a probability range to highlight if desired. otherwise skip
@@ -307,7 +350,7 @@ ggplot(dt_means) +
 #dens <- density(dt_filtered$an_d_s_SOC, adjust = 2)
 #dens_dt <- data.table(x = dens$x, y = dens$y)
 
-# no shading under the curve, instead annotate mean, med, P75, and P90 with lines
+# no shading under the curve, line annotations
 mux <-  mean(dt_filtered[, an_d_s_SOC])
 medx <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.5))
 p75x <- quantile(dt_filtered$an_d_s_SOC, probs = c(0.75))
@@ -341,9 +384,9 @@ PDF.plot <- ggplot(dt_filtered, aes(x = an_d_s_SOC)) +
                "P75"    = "#A07178",
                "P90"    = "#e8a020")) +
   labs(#title = paste("PDF: Soil Carbon Change Distribution", args[6], sep = " | "),
-       subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
-       x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
-       y = "Probability Density") +
+    subtitle = paste("Scenario:", scenario_labels[args[3]], "| Timescale:", yrs, "Years"),
+    x = expression("Soil Carbon Change (Mg C ha"^-1~"y"^-1*")"),
+    y = "Probability Density") +
   theme_minimal(base_size = 13) +
   theme(
     panel.grid.minor   = element_blank(),
@@ -383,9 +426,14 @@ stacked <- plot_grid(ccg_PDF.plot, ccg_res_PDF.plot, ccg_ntill_PDF.plot, ncol = 
 final_plot <- plot_grid(stacked, legend, ncol = 2, rel_widths = c(1, 0.2))
 print(final_plot)
 
-ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
-             "/regional_PDF_", args[6], "_", args[3], "_", args[4], ".png"),
-      width = 8.5, height = 11, units = "in", dpi = 300)
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_PDF, ".png"),
+       plot     = PDF.plot,
+       units    = "in",
+       width    = 8.5,
+       height   = 5,
+       dpi      = 300, #digital resolution
+       bg       = "white")
+
 #-------------------------------------------------------------------------------
 # Singular CDF: Cumulative Density Function
 #-------------------------------------------------------------------------------
@@ -430,3 +478,14 @@ if (exists("soc.thresh")) {
 }
 #call the plot
 print(CDF.plot)
+
+fname_cdf <- paste0("cdf-single-", args[3])
+
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/",
+                         fname_cdf, "-", args[6], ".png"),
+       plot = CDF.plot,
+       units    = "in",
+       width    = 8.5,
+       height   = 5,
+       dpi      = 300,
+       bg       = "white")

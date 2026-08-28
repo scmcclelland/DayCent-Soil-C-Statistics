@@ -1,6 +1,6 @@
 # file name:    summary-table.R
 # created:      24 July 2026
-# last updated: 24 July 2026
+# last updated: 28 August 2026
 # author:       Docker Clark
 
 # description: This script creates and outputs a table of global and regional means for various scenarios.
@@ -16,21 +16,29 @@ library(stringr)
 #-------------------------------------------------------------------------------
 # directories and startup
 #-------------------------------------------------------------------------------
-#dir = dirname(getActiveDocumentContext()$path)
-#dir = str_split(dir, '/r')
-#dir = dir[[1]][1]
-#setwd(dir)
+dir = dirname(getActiveDocumentContext()$path)
+dir = str_split(dir, '/r')
+dir = dir[[1]][1]
+setwd(dir)
 
-#base data path
-b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data"
-
-args    <- commandArgs(trailingOnly = TRUE) 
-args[1] <- "analysis-input"
-args[2] <- "analysis-output"
+#command line args 
+args     = commandArgs(trailingOnly = TRUE) 
+#these can be updated for different scenarios
+args[1] <- "data/analysis-input"
+args[2] <- "data/analysis-output"
 args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
 args[6] <- "Global"
+
+#check if there's enough info to get a filepath
+if (isFALSE(length(args) == 6)) stop( 'Needs 6 command-line argument (scenario selection, timeframe, data path,
+                                      input/output, data file header).' )
+
+#set input data directory
+in_dir <- paste(dir, args[1], sep = '/')
+#set output data directory
+o_dir <- paste(dir, args[2], sep = '/')
 
 #for later labeling
 scenario_labels <- c(
@@ -71,9 +79,8 @@ region_dt <- rbindlist(
 table_scenarios <- c("ccg", "res", "ntill", "ccg-res", "ntill-res", "ccg-ntill")
 for (s in table_scenarios) {
   #load in as dt_scenario
-  load(paste0(b_path, "/", args[1], "/",      #base file path
-              args[4], "/", args[5], "-",     #time scale & SOC delta
-              s,".RData"))                    #scenario code and extension
+  load(paste0(in_dir, "/", args[4], "/",       #base file path & time scale
+              args[5], "-", args[3],".RData")) #SOC delta & scenario code
   message(paste0("Loaded ", scenario_labels[s]))
   
   #annualize SOC as a new column so either can be used
@@ -125,5 +132,5 @@ sum_table[, cell_value := paste0(Mean, "\n(", Lower, " - ", Upper, ")")]
 sum_table <- dcast(sum_table, scenario ~ region, value.var = "cell_value")
 
 #output
-fwrite(sum_table, paste0(b_path, "/", args[2], "/", args[4], "/",
-                         "Regional_means_table.csv"))
+fwrite(sum_table, paste0(o_dir, "/", args[4], "/",
+                         "regional-means-table.csv"))

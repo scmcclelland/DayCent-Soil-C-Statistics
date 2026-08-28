@@ -1,6 +1,6 @@
 # filename:     multi-CDF-table.R    
 # created:      16 July 2026
-# last updated: 22 July 2026
+# last updated: 28 August 2026
 # author:       Docker Clark
 
 # description: This script creates, saves, and/or loads a large data.table object for the subsequent creation of a multi-CDF plot.
@@ -17,21 +17,42 @@ library(rstudioapi)
 #-------------------------------------------------------------------------------
 # directories and startup
 #-------------------------------------------------------------------------------
-#dir = dirname(getActiveDocumentContext()$path)
-#dir = str_split(dir, '/r')
-#dir = dir[[1]][1]
-#setwd(dir)
+dir = dirname(getActiveDocumentContext()$path)
+dir = str_split(dir, '/r')
+dir = dir[[1]][1]
+setwd(dir)
 
-#base path
-b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data"
-
-args    <- commandArgs(trailingOnly = TRUE) 
-args[1] <- "analysis-input"
-args[2] <- "analysis-output"
+#command line args 
+args     = commandArgs(trailingOnly = TRUE) 
+#these can be updated for different scenarios
+args[1] <- "data/analysis-input"
+args[2] <- "data/analysis-output"
 args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
-args[6] <- "USA"
+args[6] <- "Global"
+
+#check if there's enough info to get a filepath
+if (isFALSE(length(args) == 6)) stop( 'Needs 6 command-line argument (scenario selection, timeframe, data path,
+                                      input/output, data file header).' )
+
+#set input data directory
+in_dir <- paste(dir, args[1], sep = '/')
+#set output data directory
+o_dir <- paste(dir, args[2], sep = '/')
+#shapefile path
+shp_p <- paste(in_dir, "shp", sep = "/")
+
+#-------------------------------------------------------------------------------
+# read in data
+#-------------------------------------------------------------------------------
+#add a scenario "dt_scenario"
+load(paste0(in_dir, "/", args[4], "/",       #base file path & time scale
+            args[5], "-", args[3],".RData")) #SOC delta & scenario code
+
+#annualize SOC as a new column so either can be used
+yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
+dt_scenario[, an_d_s_SOC := d_s_SOC / yrs]
 
 #for later labeling
 scenario_labels <- c(
@@ -45,17 +66,13 @@ scenario_labels <- c(
   "ccl-res"   = "Legume Cover Crop & Full Residue Retention",
   "ccg-ntill" = "Grass Cover Crop, No-Tillage & Full Residue Retention",
   "ccl-ntill" = "Legume Cover Crop, No-Tillage & Full Residue Retention")
-
 #-------------------------------------------------------------------------------
-# load in spatial data
+# ADD regions
 #-------------------------------------------------------------------------------
-# define shapefile path
-shp_p <- paste(b_path, args[1], "shp", sep = "/")
-
 # read in shape file #~/analysis-input/shp
 r_shp   <- st_read(paste(shp_p, 'WB_countries_Admin0_10m.shp', sep = '/'))
 # read in crop mask
-r       <- rast(paste(b_path, args[1], 'msw-cropland-rf-ir-area.tif', sep = '/'))
+r       <- rast(paste(in_dir, 'msw-cropland-rf-ir-area.tif', sep = '/'))
 # keep first layer terra::rasterize needs a single layer raster
 r       <- r[[1]]
 
@@ -87,9 +104,15 @@ create_WB_cty <- function(shp_f, rst) {
 
 # create country data table with function
 WB_dt <- create_WB_cty(r_shp, r)
+# join country data table to simulation data
+dt_scenario <- WB_dt[, c('cell', 'WB_NAME', 'x', 'y')][dt_scenario, on = .(cell = gridid)]
 
+#rename cell to avoid confusion
+setnames(dt_scenario, "cell", "gridid")
+setorder(dt_scenario, gridid)
+gc() #garbage collection
 #-------------------------------------------------------------------------------
-# specify regions for filtering
+# Additional Desired Regions
 #-------------------------------------------------------------------------------
 regions <- list(
   "Global"         = unique(WB_dt$WB_NAME),
@@ -104,19 +127,31 @@ regions <- list(
   "Brazil"         = c("Brazil"))
 
 #-------------------------------------------------------------------------------
-# Create or load multi-scenario tables for CDFs
+# Populate data table for regional analysis
 #-------------------------------------------------------------------------------
-#reset region and timescale if desired
-yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
+# create and append regional lookup table
+region_dt <- rbindlist(
+  lapply(names(regions), function(r) data.table(region = r, WB_NAME = regions[[r]])))
 
-#set output path for tables and viz
-o_path <- paste(b_path, args[2], args[4], sep = "/")
+#allow.cartesian allows for rows to be added when a WB_NAME belongs two region groups
+# ex. France now has duplicate rows labeled "Global" and "European Union"
+dt_scenario <- merge(dt_scenario, region_dt, by = "WB_NAME", allow.cartesian = TRUE)
 
+#-------------------------------------------------------------------------------
+# Filter to desired regions
+#-------------------------------------------------------------------------------
+# reset args[6] if desired
+args[6] <- "Global"
 
-input_file  <- paste0(b_path, "/", args[1], "/",      #base file path
-                      args[4], "/", args[5], "-",     #time scale & SOC delta
-                      args[3],".RData") 
-output_file <- paste0(o_path, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], ".csv")
+#filter to correct region (necessary for all regions including global)
+dt_filtered <- dt_scenario[region == args[6], ]
+
+#-------------------------------------------------------------------------------
+# Check if table needs to be created or updated
+#-------------------------------------------------------------------------------
+input_file  <- paste0(in_dir, "/", args[4], "/",       #base file path & time scale
+                      args[5], "-", args[3],".RData") 
+output_file <- paste0(o_dir, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], ".csv")
 
 input_time  <- file.info(input_file)$mtime
 output_time <- file.info(output_file)$mtime
@@ -133,9 +168,8 @@ if (needs_rerun) {
     #reset args
     args[3] <- s
     #add a scenario "dt_scenario"
-    load(paste0(b_path, "/", args[1], "/",      #base file path
-                args[4], "/", args[5], "-",     #time scale & SOC delta
-                args[3],".RData"))              #scenario code and extension
+    load(paste0(in_dir, "/", args[4], "/",       #base file path & time scale
+                args[5], "-", args[3],".RData")) #scenario code and extension
     message(paste0("Loaded ", scenario_labels[args[3]]))
     
     # join country data table to simulation data
@@ -181,7 +215,7 @@ if (needs_rerun) {
                            "_", args[4], ".csv")
       
       fwrite(x = get(dt_name),
-             file = paste0(o_path, "/", table_name))
+             file = paste0(o_dir, "/", table_name))
       
       # report how long the loop took
       duration <- round((Sys.time()-time), 3)
