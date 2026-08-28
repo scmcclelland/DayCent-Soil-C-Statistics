@@ -1,6 +1,6 @@
 # filename:     histograms.R    
 # created:      03 April 2026
-# last updated: 30 April 2026
+# last updated: 28 August 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale.
@@ -17,31 +17,24 @@ library(ggridges)
 #-------------------------------------------------------------------------------
 # directories and startup 
 #-------------------------------------------------------------------------------
-args     = commandArgs(trailingOnly = TRUE) 
-#these can be updated for different scenarios
-args[1] <- 'ntill-res'
-args[2] <- '20-yr'
-args[3] <- '/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data'
-args[4] <- 'analysis-input'
-args[5] <- 'analysis-output'
-args[6] <- "delta-cumulative-SOC"
-#check if there's enough info to get a filepath
-if (isFALSE(length(args) == 6)) stop( 'Needs 6 command-line argument (scenario selection, timeframe, data path,
-                                      input/output, data file header).' )
-
-args    <- commandArgs(trailingOnly = TRUE) 
-args[1] <- "analysis-input"
-args[2] <- "analysis-output"
-args[3] <- "ccg"
-args[4] <- "20-yr"
-args[5] <- "delta-cumulative-SOC"
-
-
 #get current directory (dir)
 dir = dirname(getActiveDocumentContext()$path) 
 dir = str_split(dir, '/r') 
 dir = dir[[1]][1] 
 setwd(dir) # set as working directory
+
+#command line args 
+args     = commandArgs(trailingOnly = TRUE) 
+#these can be updated for different scenarios
+args[1] <- "data/analysis-input"
+args[2] <- "data/analysis-output"
+args[3] <- "ccg"
+args[4] <- "20-yr"
+args[5] <- "delta-cumulative-SOC"
+
+#check if there's enough info to get a filepath
+if (isFALSE(length(args) == 5)) stop( 'Needs 5 command-line argument (scenario selection, timeframe, data path,
+                                      input/output, data file header).' )
 
 #set input data directory
 in_dir <- paste(dir, args[1], sep = '/')
@@ -164,10 +157,10 @@ ridgeline.plot
 #create a filename to save this plot as
 fname_ridgeline <- paste("ridgeline", args[3], sep = "-")
 #save to output directory
-ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_ridgeline, ".tiff"),
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_ridgeline, ".png"),
        plot = ridgeline.plot,
        units    = "in",
-       width    = 7,
+       width    = 8.5,
        height   = 5,
        dpi      = 300,
        bg       = "white")
@@ -205,9 +198,9 @@ PDF.plot <- ggplot(dt_scenario, aes(x = d_s_SOC)) +
     plot.margin        = margin(15, 15, 10, 10))
 if (exists("dens")) {
   PDF.plot <- PDF.plot +
-  geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
-              aes(x = x, ymin = 0, ymax = y),
-              fill = "#e8a020", alpha = 0.6) +
+    geom_ribbon(data = dens_dt[x >= x1 & x <= x2],
+                aes(x = x, ymin = 0, ymax = y),
+                fill = "#e8a020", alpha = 0.6) +
     annotate("text", x = (x1 + x2) /2, y = max(dens_dt[x >= x1 & x <= x2]$y) / 2,
              label = paste0("P = ", round(prob_range, 3)),
              size = 4, fontface = "bold")
@@ -218,7 +211,7 @@ PDF.plot
 #create a filename for saving
 fname_PDF <- paste("PDF-single", args[3], sep = "-")
 #save to output directory
-ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_PDF, ".tiff"),
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_PDF, ".png"),
        plot     = PDF.plot,
        units    = "in",
        width    = 7,
@@ -254,7 +247,7 @@ CDF.plot
 #file name for saving
 fname_CDF <- paste("CDF-single", args[3], sep = "-")
 #save to output directory
-ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_CDF, ".tiff"),
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_CDF, ".png"),
        path     = CDF.plot,
        units    = "in",
        width    = 7,
@@ -284,7 +277,7 @@ means.hist.plot
 #file name for saving
 fname_mean_hist <- "histogram-multi-scenario-means"
 #save to output directory
-ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_mean_hist, ".tiff"),
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_mean_hist, ".png"),
        plot     = means.hist.plot,
        units    = "in",
        width    = 7,
@@ -319,12 +312,12 @@ ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_med_hist, ".tif
        bg       = "white")
 
 #-------------------------------------------------------------------------------
-# Output #TODO start here
+# Output Stats
 #-------------------------------------------------------------------------------
 #save the stats from each scenario to the output directory
 fwrite(x    = dt_stats,
-       file      = paste0(o_dir, "/", args[2], "_", args[1], "_stats.csv"),
-       sep       = ",")
+       file = paste0(o_dir, "/", args[4], "/", args[3],
+                     "-scenario-summary-stats.csv"))
 
 #save the mean / medians across scenarios
 if (isTRUE(ncol(dt_scenario_means) < 9)) {
@@ -334,8 +327,8 @@ if (isTRUE(ncol(dt_scenario_meds) < 9)) {
 
 #save to the output directory
 fwrite(x    = dt_scenario_means,
-       file      = paste0(o_dir, "/", args[2], "_scenario-wise-means.csv"),
+       file      = paste0(o_dir, "/", args[4], "/scenario-wise-means.csv"),
        sep       = ",")
 fwrite(x    = dt_scenario_meds,
-       file      = paste0(o_dir, "/", args[2], "_scenario-wise-medians.csv"),
+       file      = paste0(o_dir, "/", args[4], "/scenario-wise-medians.csv"),
        sep       = ",")
