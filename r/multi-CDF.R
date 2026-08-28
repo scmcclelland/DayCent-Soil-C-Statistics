@@ -1,6 +1,6 @@
 # filename:     multi-CDF.R    
 # created:      16 July 2026
-# last updated: 24 August 2026
+# last updated: 28 August 2026
 # author:       Docker Clark
 
 # description: This script creates and/or saves a multi-scenario CDF visualization.
@@ -17,24 +17,29 @@ library(rstudioapi)
 #-------------------------------------------------------------------------------
 # directories and startup
 #-------------------------------------------------------------------------------
-#dir = dirname(getActiveDocumentContext()$path)
-#dir = str_split(dir, '/r')
-#dir = dir[[1]][1]
-#setwd(dir)
+dir = dirname(getActiveDocumentContext()$path)
+dir = str_split(dir, '/r')
+dir = dir[[1]][1]
+setwd(dir)
 
-#base path
-b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data"
-
-args    <- commandArgs(trailingOnly = TRUE) 
-args[1] <- "analysis-input"
-args[2] <- "analysis-output"
+#command line args 
+args     = commandArgs(trailingOnly = TRUE) 
+#these can be updated for different scenarios
+args[1] <- "data/analysis-input"
+args[2] <- "data/analysis-output"
 args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
 args[6] <- "Global"
 
-#output directory path
-o_path <- paste(b_path, args[2], args[4], sep = "/")
+#check if there's enough info to get a filepath
+if (isFALSE(length(args) == 6)) stop( 'Needs 6 command-line argument (scenario selection, timeframe, data path,
+                                      input/output, data file header).' )
+
+#set input data directory
+in_dir <- paste(dir, args[1], sep = '/')
+#set output data directory
+o_dir <- paste(dir, args[2], sep = '/')
 
 #for later labeling
 scenario_labels <- c(
@@ -52,7 +57,7 @@ scenario_labels <- c(
 #-------------------------------------------------------------------------------
 # load in multi-cdf data table (long format) and set themes
 #-------------------------------------------------------------------------------
-dt_plot <- fread(paste0(o_path, "/ccg_scenarios_",     #output directory
+dt_plot <- fread(paste0(o_dir, "/ccg_scenarios_",     #output directory
                         gsub(" ", "_", args[6]), "_",  #region
                         args[4], ".csv"))              #timescale
 
@@ -162,9 +167,16 @@ CDF.plot <- ggplot(dt_plot[scenario %in% c("ccg", "ccg-res", "ntill", "ntill-res
   annotate("text", x = 2.5, y = 0.95, label = 
              paste("n =", format(min(unique_gridids[ , n]), big.mark = ",")),
            hjust = 1, size = 3.5, fontface = "bold") 
-  
+#call the plot
 print(CDF.plot)
 
-#ggsave(paste0("/gpfs/scratch/docclark/woodwell/DayCent-Soil-C-Statistics/output", 
-#              "/multi-CDF_", gsub(" ", "_", args[6]), "_", args[4], ".png"),
-#       width = 8.5, height = 5, units = "in", dpi = 300)
+#file name for saving
+fname_CDF <- paste("CDF-multi-scenario", args[6], sep = "-")
+#save to output directory
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_CDF, ".png"),
+       path     = CDF.plot,
+       units    = "in",
+       width    = 8.5,
+       height   = 5,
+       dpi      = 300,
+       bg       = "white")

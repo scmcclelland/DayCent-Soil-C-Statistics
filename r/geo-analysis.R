@@ -426,12 +426,12 @@ stacked <- plot_grid(ccg_PDF.plot, ccg_res_PDF.plot, ccg_ntill_PDF.plot, ncol = 
 final_plot <- plot_grid(stacked, legend, ncol = 2, rel_widths = c(1, 0.2))
 print(final_plot)
 
-ggsave(filename = paste0(o_dir, "/", args[4], "/figures/pdf-multi-scenario-", args[6], ".png"),
-       plot = final_plot,
+ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_PDF, ".png"),
+       plot     = PDF.plot,
        units    = "in",
        width    = 8.5,
        height   = 5,
-       dpi      = 300,
+       dpi      = 300, #digital resolution
        bg       = "white")
 
 #-------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 # filename:     geo-analysis-crop.R    
 # created:      16 July 2026
-# last updated: 17 July 2026
+# last updated: 28 August 2026
 # author:       Docker Clark
 
 # description: This script computes statistics and makes a visualizations for scenarios on a 10 or 20-yr timescale and at regional or national scales.
@@ -15,33 +15,43 @@ library(terra)
 library(ggplot2)
 library(ggridges)
 library(stringr)
+library(rstudioapi)
 
 #-------------------------------------------------------------------------------
 # directories and startup
 #-------------------------------------------------------------------------------
-#dir = dirname(getActiveDocumentContext()$path)
-#dir = str_split(dir, '/r')
-#dir = dir[[1]][1]
-#setwd(dir)
+dir = dirname(getActiveDocumentContext()$path)
+dir = str_split(dir, '/r')
+dir = dir[[1]][1]
+setwd(dir)
 
-#base data path
-b_path <- "/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data"
-
-args    <- commandArgs(trailingOnly = TRUE) 
-args[1] <- "analysis-input"
-args[2] <- "analysis-output"
+#command line args 
+args     = commandArgs(trailingOnly = TRUE) 
+#these can be updated for different scenarios
+args[1] <- "data/analysis-input"
+args[2] <- "data/analysis-output"
 args[3] <- "ccg"
 args[4] <- "20-yr"
 args[5] <- "delta-cumulative-SOC"
-args[6] <- "Europe"
+args[6] <- "Global"
 
-#assuming shp_p means shapefile path
-shp_p <- paste(b_path, args[1], "shp", sep = "/")
+#check if there's enough info to get a filepath
+if (isFALSE(length(args) == 6)) stop( 'Needs 6 command-line argument (scenario selection, timeframe, data path,
+                                      input/output, data file header).' )
 
+#set input data directory
+in_dir <- paste(dir, args[1], sep = '/')
+#set output data directory
+o_dir <- paste(dir, args[2], sep = '/')
+#shapefile path
+shp_p <- paste(in_dir, "shp", sep = "/")
+
+#-------------------------------------------------------------------------------
+# read in data
+#-------------------------------------------------------------------------------
 #add a scenario "dt_scenario"
-load(paste0(b_path, "/", args[1], "/",      #base file path
-            args[4], "/", args[5], "-",     #time scale & SOC delta
-            args[3],".RData"))              #scenario code and extension
+load(paste0(in_dir, "/", args[4], "/",       #base file path & time scale
+            args[5], "-", args[3],".RData")) #SOC delta & scenario code
 
 #annualize SOC as a new column so either can be used
 yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
@@ -65,7 +75,7 @@ scenario_labels <- c(
 # read in shape file #~/analysis-input/shp
 r_shp   <- st_read(paste(shp_p, 'WB_countries_Admin0_10m.shp', sep = '/'))
 # read in crop mask
-r       <- rast(paste(b_path, args[1], 'msw-cropland-rf-ir-area.tif', sep = '/'))
+r       <- rast(paste(in_dir, 'msw-cropland-rf-ir-area.tif', sep = '/'))
 # keep first layer terra::rasterize needs a single layer raster
 r       <- r[[1]]
 
@@ -164,10 +174,11 @@ regions <- list(
                        'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
                        'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
                        'Spain', 'Sweden'),
-  "USA"            = c("United States of America"))
+  "USA"            = c("United States of America"),
+  "Brazil"         = c("Brazil"))
 
 #-------------------------------------------------------------------------------
-# Filter to desired regions
+# Populate data table for regional analysis
 #-------------------------------------------------------------------------------
 # create and append regional lookup table
 region_dt <- rbindlist(
@@ -177,10 +188,13 @@ region_dt <- rbindlist(
 # ex. France now has duplicate rows labeled "Global" and "European Union"
 dt_scenario <- merge(dt_scenario, region_dt, by = "WB_NAME", allow.cartesian = TRUE)
 
+#-------------------------------------------------------------------------------
+# Filter to desired regions
+#-------------------------------------------------------------------------------
 # reset args[6] if desired
 args[6] <- "Global"
 
-#filter to correct region
+#filter to correct region (necessary for all regions including global)
 dt_filtered <- dt_scenario[region == args[6], ]
 
 #-------------------------------------------------------------------------------
@@ -267,8 +281,23 @@ for (crop in c("corn", "soyb", "wheat")) {
   }
   #call the plot
   print(PDF.plot)
+  #assign plot
+  assign(paste0("PDF.", crop), PDF.plot)
+  #assign name
+  assign(paste0("fname_pdf_", crop), paste0("pdf-single-", args[3], "-", args[6], "-", crop))
 }
 
+# a loop to save all crop-wise plots
+for (crop in c("corn", "soyb", "wheat")) {
+  ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", 
+                           get(paste0("fname_pdf_", crop)), ".png"),
+         plot     = get(paste0("PDF.", crop)),
+         units    = "in",
+         width    = 8.5,
+         height   = 5,
+         dpi      = 300, #digital resolution
+         bg       = "white")
+}
 #-------------------------------------------------------------------------------
 # Singular CDF: Cumulative Density Function
 #-------------------------------------------------------------------------------
@@ -316,4 +345,21 @@ for (crop in c("corn", "soyb", "wheat")) {
   }
   #call the plot
   print(CDF.plot)
+  
+  #assign plot
+  assign(paste0("CDF.", crop), CDF.plot)
+  #assign name
+  assign(paste0("fname_cdf_", crop), paste0("cdf-single-", args[3], "-", args[6], "-", crop))
+}
+
+# a loop to save all crop-wise plots
+for (crop in c("corn", "soyb", "wheat")) {
+  ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", 
+                           get(paste0("fname_cdf_", crop)), ".png"),
+         plot     = get(paste0("CDF.", crop)),
+         units    = "in",
+         width    = 8.5,
+         height   = 5,
+         dpi      = 300, #digital resolution
+         bg       = "white")
 }
