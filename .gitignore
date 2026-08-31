@@ -64,3 +64,4 @@ bash/
 data/
 logs/
 AGENTS.md
+r/estimate-delta-SOC-raw.R
