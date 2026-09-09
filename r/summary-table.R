@@ -4,12 +4,14 @@
 # author:       Docker Clark
 
 # description: This script creates and outputs a table of global and regional means for various scenarios.
-# dependencies: this script requires a table WB_dt created by the geo-analysis.R script
+# dependencies: World Bank country shapefile and cropland raster under data/analysis-input
 #-------------------------------------------------------------------------------
 # libraries 
 #-------------------------------------------------------------------------------
 
 library(data.table)
+library(sf)
+library(terra)
 library(rstudioapi)
 library(stringr)
 
@@ -39,6 +41,7 @@ if (isFALSE(length(args) == 6)) stop( 'Needs 6 command-line argument (scenario s
 in_dir <- paste(dir, args[1], sep = '/')
 #set output data directory
 o_dir <- paste(dir, args[2], sep = '/')
+shp_p <- paste(in_dir, "shp", sep = "/")
 
 #for later labeling
 scenario_labels <- c(
@@ -52,6 +55,31 @@ scenario_labels <- c(
   "ccl-res"   = "Legume Cover Crop & Full Residue Retention",
   "ccg-ntill" = "Grass Cover Crop, No-Tillage & Full Residue Retention",
   "ccl-ntill" = "Legume Cover Crop, No-Tillage & Full Residue Retention")
+
+#-------------------------------------------------------------------------------
+# Create country lookup table
+#-------------------------------------------------------------------------------
+r_shp <- st_read(paste(shp_p, 'WB_countries_Admin0_10m.shp', sep = '/'))
+r <- rast(paste(in_dir, 'msw-cropland-rf-ir-area.tif', sep = '/'))
+r <- r[[1]]
+
+create_WB_cty <- function(shp_f, rst) {
+  shp_dt <- as.data.table(st_drop_geometry(shp_f))
+  country_sf <- st_transform(shp_f, crs(rst))
+  country_r <- terra::rasterize(
+    x = vect(country_sf),
+    y = rst,
+    field = "OBJECTID",
+    touches = TRUE
+  )
+  country_dt <- as.data.table(as.data.frame(country_r, cells = TRUE, xy = TRUE))
+  shp_names <- data.table(WB_NAME = shp_dt$WB_NAME,
+                          ID = shp_dt$OBJECTID)
+  country_dt <- country_dt[shp_names, on = .(OBJECTID = ID)]
+  return(country_dt)
+}
+
+WB_dt <- create_WB_cty(r_shp, r)
 
 # Add desired regions
 regions <- list(
