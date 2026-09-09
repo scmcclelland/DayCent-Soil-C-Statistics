@@ -77,16 +77,17 @@ region_dt <- rbindlist(
 # for later filtration. Note: resultant tables contain duplicate rows and must be filtered
 # by region.
 table_scenarios <- c("ccg", "res", "ntill", "ccg-res", "ntill-res", "ccg-ntill")
+spatial_summaries <- list()
 for (s in table_scenarios) {
   #load in as dt_scenario
   load(paste0(in_dir, "/", args[4], "/",       #base file path & time scale
-              args[5], "-", args[3],".RData")) #SOC delta & scenario code
+              args[5], "-", s, ".RData")) #SOC delta & scenario code
   message(paste0("Loaded ", scenario_labels[s]))
   
   #annualize SOC as a new column so either can be used
   yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
   dt_scenario[, an_d_s_SOC := d_s_SOC / yrs]
-  
+
   # join country data table to simulation data
   dt_scenario <- WB_dt[, c('cell', 'WB_NAME', 'x', 'y')][dt_scenario, on = .(cell = gridid)]
   
@@ -98,6 +99,22 @@ for (s in table_scenarios) {
   #allow.cartesian allows for rows to be added when a WB_NAME belongs two region groups
   # ex. France now has duplicate rows labeled "Global" and "European Union"
   dt_scenario <- merge(dt_scenario, region_dt, by = "WB_NAME", allow.cartesian = TRUE)
+
+  #-----------------------------------------------------------------------------
+  # Calculate global and regional means and spatial standard deviations
+  #-----------------------------------------------------------------------------
+  dt_grid_means <- dt_scenario[, .(
+    mean_SOC = mean(an_d_s_SOC)
+  ), by = .(region, gridid)]
+
+  spatial_summaries[[s]] <- dt_grid_means[, .(
+    scenario = scenario_labels[s],
+    n_gridids = .N,
+    Mean = mean(mean_SOC),
+    SD = sd(mean_SOC)
+  ), by = region]
+
+  rm(dt_grid_means)
   
   message("Calculating means by region")
   dt_scenario <- dt_scenario[, .(
@@ -134,3 +151,11 @@ sum_table <- dcast(sum_table, scenario ~ region, value.var = "cell_value")
 #output
 fwrite(sum_table, paste0(o_dir, "/", args[4], "/",
                          "regional-means-table.csv"))
+
+#-------------------------------------------------------------------------------
+# Build global and regional spatial summary table
+#-------------------------------------------------------------------------------
+regional_spatial_table <- rbindlist(spatial_summaries)
+
+fwrite(regional_spatial_table,
+       paste0(o_dir, "/", args[4], "/regional-spatial-summary.csv"))
