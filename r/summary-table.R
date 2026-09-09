@@ -1,6 +1,6 @@
 # file name:    summary-table.R
 # created:      24 July 2026
-# last updated: 28 August 2026
+# last updated: 09 September 2026
 # author:       Docker Clark
 
 # description: This script creates and outputs a table of global and regional means for various scenarios.
