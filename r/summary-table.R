@@ -77,6 +77,7 @@ region_dt <- rbindlist(
 # for later filtration. Note: resultant tables contain duplicate rows and must be filtered
 # by region.
 table_scenarios <- c("ccg", "res", "ntill", "ccg-res", "ntill-res", "ccg-ntill")
+table_scenarios <- table_scenarios[table_scenarios %in% args[3]]
 spatial_summaries <- list()
 for (s in table_scenarios) {
   #load in as dt_scenario
@@ -158,4 +159,4 @@ fwrite(sum_table, paste0(o_dir, "/", args[4], "/",
 regional_spatial_table <- rbindlist(spatial_summaries)
 
 fwrite(regional_spatial_table,
-       paste0(o_dir, "/", args[4], "/regional-spatial-summary.csv"))
+       paste0(o_dir, "/", args[4], "/", args[3],"-regional-spatial-summary.csv"))
