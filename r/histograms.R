@@ -48,11 +48,6 @@ o_dir <- paste(dir, args[2], sep = '/')
 load(paste0(in_dir, "/", args[4], "/",       #base file path & time scale
             args[5], "-", args[3],".RData")) #SOC delta & scenario code
 
-#for DBC
-load(paste0("/gpfs/projects/McClellandGroup/projects/woodwell/DayCent-Soil-C-Statistics/data/analysis-input/",      #base file path
-            args[4], "/", args[5], "-",     #time scale & SOC delta
-            args[3],".RData"))              #scenario code and extension
-
 #-------------------------------------------------------------------------------
 # data manipulation
 #-------------------------------------------------------------------------------
@@ -248,7 +243,7 @@ CDF.plot
 fname_CDF <- paste("CDF-single", args[3], sep = "-")
 #save to output directory
 ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_CDF, ".png"),
-       path     = CDF.plot,
+       plot     = CDF.plot,
        units    = "in",
        width    = 8.5,
        height   = 5,
