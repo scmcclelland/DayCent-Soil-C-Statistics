@@ -70,8 +70,8 @@ yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
 load(file.path(
   o_dir, args[4],
   paste0("ccg_scenarios_", gsub(" ", "_", args[6]), ".RData")))
-dt_crops <- dt_plot
-
+{dt_crops <- dt_plot
+rm(dt_plot)}
 #split by crop
 dt_corn <- dt_crops[crop == "maiz", ]
 dt_soyb <- dt_crops[crop == "soyb", ]
