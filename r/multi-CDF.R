@@ -1,6 +1,6 @@
 # filename:     multi-CDF.R    
 # created:      16 July 2026
-# last updated: 28 August 2026
+# last updated: 28 September 2026
 # author:       Docker Clark
 
 # description: This script creates and/or saves a multi-scenario CDF visualization.
@@ -57,9 +57,8 @@ scenario_labels <- c(
 #-------------------------------------------------------------------------------
 # load in multi-cdf data table (long format) and set themes
 #-------------------------------------------------------------------------------
-dt_plot <- fread(paste0(o_dir, "/ccg_scenarios_",     #output directory
-                        gsub(" ", "_", args[6]), "_",  #region
-                        args[4], ".csv"))              #timescale
+load(file.path(o_dir, args[4], 
+               paste0("ccg_scenarios_", gsub(" ", "_", args[6]), ".RData")))
 
 #if desired, set an SOC threshold for annotation
 soc.thresh <- 0.5 #in Mg / ha / yr
@@ -174,7 +173,7 @@ print(CDF.plot)
 fname_CDF <- paste("CDF-multi-scenario", args[6], sep = "-")
 #save to output directory
 ggsave(filename = paste0(o_dir, "/", args[4], "/figures/", fname_CDF, ".png"),
-       path     = CDF.plot,
+       plot     = CDF.plot,
        units    = "in",
        width    = 8.5,
        height   = 5,

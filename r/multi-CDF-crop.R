@@ -1,6 +1,6 @@
 # filename:     multi-CDF-crop.R    
 # created:      26 June 2026
-# last updated: 28 August 2026
+# last updated: 28 September 2026
 # author:       Docker Clark
 
 # description: This script performs two main functions:
@@ -62,12 +62,15 @@ scenario_labels <- c(
 # Load multi-scenario tables for CDFs and split by crop
 #-------------------------------------------------------------------------------
 #reset region and timescale if desired
-args[6] <- "Oceania"
+args[6] <- "Global"
 args[4] <- "20-yr"
 yrs <- as.numeric(str_split(args[4], "-")[[1]][1])
 
 #load in table according to region (args[6]) and time scale (args[4]) 
-dt_crops <- fread(paste0(o_dir, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], ".csv"))
+load(file.path(
+  o_dir, args[4],
+  paste0("ccg_scenarios_", gsub(" ", "_", args[6]), ".RData")))
+dt_crops <- dt_plot
 
 #split by crop
 dt_corn <- dt_crops[crop == "maiz", ]

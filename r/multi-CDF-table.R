@@ -1,6 +1,6 @@
 # filename:     multi-CDF-table.R    
 # created:      16 July 2026
-# last updated: 28 August 2026
+# last updated: 28 September 2026
 # author:       Docker Clark
 
 # description: This script creates, saves, and/or loads a large data.table object for the subsequent creation of a multi-CDF plot.
@@ -124,7 +124,8 @@ regions <- list(
                        'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
                        'Spain', 'Sweden'),
   "USA"            = c("United States of America"),
-  "Brazil"         = c("Brazil"))
+  "Brazil"         = c("Brazil"),
+  "China"          = c("China"))
 
 #-------------------------------------------------------------------------------
 # Populate data table for regional analysis
@@ -151,7 +152,7 @@ dt_filtered <- dt_scenario[region == args[6], ]
 #-------------------------------------------------------------------------------
 input_file  <- paste0(in_dir, "/", args[4], "/",       #base file path & time scale
                       args[5], "-", args[3],".RData") 
-output_file <- paste0(o_dir, "/ccg_scenarios_", gsub(" ", "_", args[6]), "_", args[4], ".csv")
+output_file <- paste0(o_dir, "/", args[4], "/ccg_scenarios_", gsub(" ", "_", args[6]), ".RData")
 
 input_time  <- file.info(input_file)$mtime
 output_time <- file.info(output_file)$mtime
@@ -211,11 +212,9 @@ if (needs_rerun) {
     
     #on last iteration, save the table
     if (s == "ntill-res") {
-      table_name <- paste0("ccg_scenarios_", gsub(" ", "_", args[6]),
-                           "_", args[4], ".csv")
-      
-      fwrite(x = get(dt_name),
-             file = paste0(o_dir, "/", table_name))
+      table_name <- basename(output_file)
+      dt_plot <- get(dt_name)
+      save(dt_plot, file = output_file)
       
       # report how long the loop took
       duration <- round((Sys.time()-time), 3)
@@ -227,6 +226,6 @@ if (needs_rerun) {
   }
 } else { #if the correct table does exist in the output directory, load it.
   message("Data are up to date. Loading in...")
-  dt_plot <- fread(output_file)
+  load(output_file)
 
 }
