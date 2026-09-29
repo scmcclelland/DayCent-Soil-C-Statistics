@@ -1,6 +1,6 @@
 # file name:    summary-table.R
 # created:      24 July 2026
-# last updated: 09 September 2026
+# last updated: 24 September 2026
 # author:       Docker Clark
 
 # description: This script creates and outputs a table of global and regional means for various scenarios.
@@ -92,7 +92,8 @@ regions <- list(
                        'Poland', 'Portugal', 'Romania', 'Slovak Republic', 'Slovenia',
                        'Spain', 'Sweden'),
   "USA"            = c("United States of America"),
-  "Brazil"         = c("Brazil"))
+  "Brazil"         = c("Brazil"),
+  "China"          = c("China"))
 
 # create regional lookup table
 region_dt <- rbindlist(
@@ -105,7 +106,7 @@ region_dt <- rbindlist(
 # for later filtration. Note: resultant tables contain duplicate rows and must be filtered
 # by region.
 table_scenarios <- c("ccg", "res", "ntill", "ccg-res", "ntill-res", "ccg-ntill")
-table_scenarios <- table_scenarios[table_scenarios %in% args[3]]
+#table_scenarios <- table_scenarios[table_scenarios %in% args[3]] #for running one scenario at a time
 spatial_summaries <- list()
 for (s in table_scenarios) {
   #load in as dt_scenario
@@ -132,20 +133,25 @@ for (s in table_scenarios) {
   #-----------------------------------------------------------------------------
   # Calculate global and regional means and spatial standard deviations
   #-----------------------------------------------------------------------------
-  dt_grid_means <- dt_scenario[, .(
-    mean_SOC = mean(an_d_s_SOC)
+  dt_grid_stats <- dt_scenario[, .(
+    mean_SOC = mean(an_d_s_SOC),
+    med_SOC  = median(an_d_s_SOC)
   ), by = .(region, gridid)]
 
-  spatial_summaries[[s]] <- dt_grid_means[, .(
+  spatial_summaries[[s]] <- dt_grid_stats[, .(
     scenario = scenario_labels[s],
     n_gridids = .N,
     Mean = mean(mean_SOC),
-    SD = sd(mean_SOC)
+    SD_mean = sd(mean_SOC),
+    Median = median(med_SOC),
+    SD_med = sd(med_SOC),
+    P75 = quantile(med_SOC, probs = 0.75),
+    P90 = quantile(med_SOC, probs = 0.90)
   ), by = region]
 
-  rm(dt_grid_means)
+  rm(dt_grid_stats)
   
-  message("Calculating means by region")
+  message("Calculating stats by region")
   dt_scenario <- dt_scenario[, .(
     Mean   = mean(an_d_s_SOC)), 
     by = .(region, rep)] #must include by = region
